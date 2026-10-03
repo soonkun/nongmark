@@ -51,6 +51,9 @@ type WebView interface {
 	// SetFrameless removes the system title bar (the page draws its own). Nongmak addition.
 	SetFrameless(on bool)
 
+	// SetCloseHook intercepts WM_CLOSE so the page can ask about unsaved documents. Nongmak addition.
+	SetCloseHook(f func())
+
 	// WindowCommand asks the window to start a drag/resize, minimize, maximize/restore or close. Returns whether maximized. Nongmak addition.
 	WindowCommand(cmd string) bool
 

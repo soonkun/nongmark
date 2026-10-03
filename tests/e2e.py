@@ -47,21 +47,23 @@ with sync_playwright() as p:
     assert page.locator(".nm-pm script").count() == 0 and "<script>alert(1)</script>" in page.inner_text(".nm-pm")
     assert page.locator(".tab").count() == 1 and page.inner_text(".tab.on .tab-name") == "시작"
     page.screenshot(path=str(ROOT / "build" / "editor.png"))
-    page.click(".nm-pm input[type=checkbox] >> nth=0"); time.sleep(1.2)
-    assert "- [x] 할 일 하나" in files()["시작.md"], files()["시작.md"]
-    page.click(".nm-pm p >> nth=0"); page.keyboard.press("End"); page.keyboard.type(" 덧붙임"); time.sleep(1.2)
+    page.click(".nm-pm input[type=checkbox] >> nth=0"); time.sleep(0.4)
+    assert "- [x] 할 일 하나" not in files()["시작.md"] and page.locator(".tab.on .tab-dot.show").count() == 1, "자동 저장하지 않고 ● 표시"
+    page.keyboard.press("Control+s"); time.sleep(0.4)
+    assert "- [x] 할 일 하나" in files()["시작.md"] and page.locator(".tab.on .tab-dot.show").count() == 0, "Ctrl+S로 저장"
+    page.click(".nm-pm p >> nth=0"); page.keyboard.press("End"); page.keyboard.type(" 덧붙임"); page.keyboard.press("Control+s"); time.sleep(0.4)
     assert "덧붙임" in files()["시작.md"], "편집 저장"
     # 문서 끝에서 Enter → 빈 문단 → / 메뉴로 표
-    page.keyboard.press("Control+End"); page.keyboard.press("Enter"); page.keyboard.type("/표"); page.wait_for_selector(".nm-slash-item"); page.keyboard.press("Enter"); time.sleep(1.2)
+    page.keyboard.press("Control+End"); page.keyboard.press("Enter"); page.keyboard.type("/표"); page.wait_for_selector(".nm-slash-item"); page.keyboard.press("Enter"); page.keyboard.press("Control+s"); time.sleep(0.4)
     assert "| --- | --- | --- |" in files()["시작.md"], files()["시작.md"]
     assert not page.is_hidden("#f-tablebar"), "표 안이면 표 도구가 보인다"
-    page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); time.sleep(1.2)
+    page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); page.keyboard.press("Control+s"); time.sleep(0.4)
     assert "| 가 | 나 |  |" in files()["시작.md"], files()["시작.md"]
     # 표 둘레 테두리의 모서리를 끌면 표 전체 너비가 바뀌고 열 너비가 파일에 남는다
     assert not page.is_hidden(".nm-desk:not([hidden]) .nm-tablebox")
     w0 = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-pm table').getBoundingClientRect().width")
     hb = page.locator(".nm-desk:not([hidden]) .nm-tablebox-h[data-dir=bottom-right]").bounding_box()
-    page.mouse.move(hb["x"] + 6, hb["y"] + 6); page.mouse.down(); page.mouse.move(hb["x"] - 120, hb["y"] + 6, steps=6); page.mouse.up(); time.sleep(1.3)
+    page.mouse.move(hb["x"] + 6, hb["y"] + 6); page.mouse.down(); page.mouse.move(hb["x"] - 120, hb["y"] + 6, steps=6); page.mouse.up(); page.keyboard.press("Control+s"); time.sleep(0.4)
     w1 = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-pm table').getBoundingClientRect().width")
     print("표 너비:", round(w0), "→", round(w1)); assert w1 < w0 - 80 and "<!-- cols:" in files()["시작.md"]
     page.click(".nm-pm a:has-text('바깥')", modifiers=["Control"]); time.sleep(0.3)  # 편집 중엔 Ctrl+클릭이 링크 열기
@@ -73,7 +75,7 @@ with sync_playwright() as p:
     page.click("#btn-file"); page.click("#m-new"); page.wait_for_selector(".tab.on:has-text('새 문서')"); time.sleep(0.3)
     assert page.locator(".tab").count() == 3 and page.locator(".tab.on .tab-dot.show").count() == 1
     page.keyboard.type("새 문서 본문")
-    page.keyboard.press("Control+s"); time.sleep(1)
+    page.keyboard.press("Control+s"); time.sleep(0.6)
     assert "새 문서.md" in files() and "새 문서 본문" in files()["새 문서.md"], repr(files().get("새 문서.md"))
     assert page.inner_text(".tab.on .tab-name") == "새 문서" and page.locator(".tab.on .tab-dot.show").count() == 0
     page.keyboard.press("Control+w"); time.sleep(0.3)
@@ -84,8 +86,14 @@ with sync_playwright() as p:
     page.click(".nm-desk:not([hidden]) .nm-pm p >> nth=0"); page.keyboard.press("Home")
     for _ in range(2): page.keyboard.press("Shift+ArrowRight")
     time.sleep(0.2); assert not page.is_hidden(".nm-desk:not([hidden]) .nm-bubble"), "서식 띠"
-    page.click("#rail [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); time.sleep(1.2)
+    page.click("#rail [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); page.keyboard.press("Control+s"); time.sleep(0.4)
     assert '<span style="color:#c00000">**첫**</span>' in files()["시작.md"], files()["시작.md"]
+    # 저장 안 된 채 탭을 닫으면 저장/저장 안 함/취소를 묻는다
+    page.keyboard.type("임시"); time.sleep(0.2); page.keyboard.press("Control+w"); page.wait_for_selector(".ask")
+    page.click(".ask button:has-text('취소')"); assert page.locator(".ask").count() == 0 and page.locator(".tab").count() == 2
+    page.keyboard.press("Control+w"); page.wait_for_selector(".ask"); page.click(".ask button:has-text('저장 안 함')"); time.sleep(0.3)
+    assert page.locator(".tab").count() == 1 and "임시" not in files()["시작.md"]
+    page.evaluate("window.__openNext = '시작.md'"); page.click("#btn-file"); page.click("#m-open"); page.wait_for_selector(".tab.on:has-text('시작')"); time.sleep(0.4)
     page.screenshot(path=str(ROOT / "build" / "editor2.png"))
     # 창 제목 줄 = 탭 줄: 빈 곳을 끌면 창 끌기, 두 번 누르면 최대화, 오른쪽 단추
     assert not page.is_hidden("#wincmd")

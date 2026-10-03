@@ -122,7 +122,7 @@ func main() {
 	// 창 조작(제목 줄 없는 창이라 화면의 탭 줄이 끌기·최소/최대화·닫기를 맡는다). 허용된 명령 외에는 아무 일도 하지 않는다.
 	must("nm_win", func(cmd string) bool {
 		switch cmd {
-		case "drag", "resize-top", "resize-top-left", "resize-top-right", "min", "max", "close", "state":
+		case "drag", "resize-top", "resize-top-left", "resize-top-right", "min", "max", "close", "close-now", "state":
 			return w.WindowCommand(cmd)
 		}
 		return false
@@ -190,6 +190,8 @@ func main() {
 	})
 	w.Init("window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;")
 	w.SetFrameless(true)
+	// 창을 닫으려 하면(단추·Alt+F4·작업 표시줄) 화면에 먼저 묻는다 - 저장 안 된 문서가 있으면 저장할지 묻고 "close-now"로 답한다
+	w.SetCloseHook(func() { w.Eval("window.nmRequestClose && window.nmRequestClose()") })
 	w.SetHtml(page)
 	w.Run()
 }

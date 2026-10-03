@@ -50,7 +50,8 @@ type webview struct {
 	mainthread uintptr
 	browser    browser
 	autofocus  bool
-	frameless  bool // 농막: 시스템 제목 줄 없이(WM_NCCALCSIZE로 위쪽 캡션만 떼어 낸다 - 테두리·그림자·끌어 붙이기는 그대로)
+	frameless  bool   // 농막: 시스템 제목 줄 없이(WM_NCCALCSIZE로 위쪽 캡션만 떼어 낸다 - 테두리·그림자·끌어 붙이기는 그대로)
+	closeHook  func() // 농막: 창을 닫으려 할 때(Alt+F4·작업 표시줄) 먼저 부른다 - 화면이 저장 여부를 묻고 "close-now"로 답한다
 	maxsz      w32.Point
 	minsz      w32.Point
 	m          sync.Mutex
@@ -238,6 +239,10 @@ func wndproc(hwnd, msg, wp, lp uintptr) uintptr {
 				w.browser.Focus()
 			}
 		case w32.WMClose:
+			if w.closeHook != nil {
+				w.closeHook()
+				return 0
+			}
 			_, _, _ = w32.User32DestroyWindow.Call(hwnd)
 		case w32.WMDestroy:
 			w.Terminate()
@@ -405,6 +410,9 @@ func (w *webview) SetFrameless(on bool) {
 	_, _, _ = w32.User32SetWindowPos.Call(w.hwnd, 0, 0, 0, 0, 0, w32.SWPNoMove|w32.SWPNoSize|w32.SWPNoZOrder|w32.SWPFrameChanged)
 }
 
+// SetCloseHook: WM_CLOSE를 가로채는 함수. nil이면 바로 닫는다.
+func (w *webview) SetCloseHook(f func()) { w.closeHook = f }
+
 // WindowCommand: 화면의 제목 줄(탭 줄)이 부탁하는 창 조작. "drag" 끌기 시작, "resize-top" 위쪽 크기 조절, "min"/"max"/"close".
 // 돌려주는 값은 최대화 여부(화면이 단추 모양을 맞춘다).
 func (w *webview) WindowCommand(cmd string) bool {
@@ -429,8 +437,10 @@ func (w *webview) WindowCommand(cmd string) bool {
 		} else {
 			_, _, _ = w32.User32ShowWindow.Call(w.hwnd, w32.SWMaximize)
 		}
-	case "close":
+	case "close": // 닫기 요청 - closeHook이 있으면 화면이 먼저 묻는다
 		_, _, _ = w32.User32PostMessageW.Call(w.hwnd, w32.WMClose, 0, 0)
+	case "close-now": // 화면이 묻고 난 뒤의 진짜 닫기
+		_, _, _ = w32.User32DestroyWindow.Call(w.hwnd)
 	}
 	z, _, _ := w32.User32IsZoomed.Call(w.hwnd)
 	return z != 0

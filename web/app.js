@@ -108,7 +108,7 @@ function resolvePath(rel, t = cur()) {
 
 /** 탭을 만들고 편집기를 붙인다. */
 async function addTab(doc, markdown) {
-  const t = { untitled: false, dirty: false, saveTimer: null, ...doc };
+  const t = { untitled: false, dirty: false, ...doc };
   t.host = el("div", "nm-desk");
   t.host.hidden = true;
   $("#editors").append(t.host);
@@ -141,10 +141,7 @@ async function addTab(doc, markdown) {
 /** 탭 j를 보여 준다. 지금 문서는 저장해 두고(제목 없는 새 문서는 탭에 남는다) 바꾼다. */
 async function activate(j) {
   const prev = cur();
-  if (prev && prev !== state.tabs[j]) {
-    if (prev.dirty && !prev.untitled && prev.store?.kind === "native") await save(prev);
-    prev.host.hidden = true;
-  }
+  if (prev && prev !== state.tabs[j]) prev.host.hidden = true;
   state.tab = j;
   const t = cur();
   t.host.hidden = false;
@@ -153,16 +150,16 @@ async function activate(j) {
   setDocTitle();
   countChars();
   fmtState();
-  status(t.untitled ? "저장하지 않은 새 문서 (Ctrl+S)" : "열림");
+  status(t.dirty ? "저장 안 됨 · Ctrl+S" : t.untitled ? "새 문서" : "열림");
 }
 
 async function closeTab(j) {
   const t = state.tabs[j];
   if (!t) return;
-  if (j === state.tab) {
-    if (!(await flush())) return;
-  } else if (t.dirty && (t.untitled || t.store.kind !== "native") && !confirm(`"${nameOf(t)}"에 저장하지 않은 내용이 있습니다. 버리고 닫을까요?`)) return;
-  clearTimeout(t.saveTimer);
+  if (t.dirty) {
+    if (j !== state.tab) await activate(j); // 어느 문서인지 보이게 한 뒤 묻는다
+    if (!(await askSave(t))) return;
+  }
   t.ed.destroy();
   t.host.remove();
   state.tabs.splice(j, 1);
@@ -271,22 +268,17 @@ function countChars() {
   $("#count").textContent = `${text.replace(/\s/g, "").length.toLocaleString("ko-KR")}자`;
 }
 
+// 고친 내용은 자동 저장하지 않는다(한글·워드처럼). 탭의 ●와 상태 줄이 "저장 안 됨"을 알리고, Ctrl+S로 저장한다.
 function changed() {
   const t = cur();
   if (!t) return;
   if (!t.dirty) { t.dirty = true; renderTabs(); }
   countChars();
-  if (t.untitled) return status("저장하지 않은 새 문서 (Ctrl+S)");
-  status(t.store.kind === "single" ? "저장 안 됨 (Ctrl+S로 내려받기)" : "저장 중…");
-  if (t.store.kind !== "single") {
-    clearTimeout(t.saveTimer);
-    t.saveTimer = setTimeout(() => save(t), 800);
-  }
+  status(t.store.kind === "single" ? "저장 안 됨 · Ctrl+S로 내려받기" : "저장 안 됨 · Ctrl+S");
 }
 
 async function save(t = cur()) {
   if (!t) return true;
-  clearTimeout(t.saveTimer);
   if (t.untitled) return saveAs();
   if (!t.path || !t.dirty) return true;
   const text = docText(t);
@@ -302,13 +294,50 @@ async function save(t = cur()) {
   }
 }
 
-async function flush() {
-  const t = cur();
-  if (!t || !t.dirty) return true;
-  if (t.untitled) return confirm("저장하지 않은 새 문서가 있습니다. 버리고 계속할까요?");
-  if (t.store.kind === "single") return confirm("저장하지 않은 내용이 있습니다. 버리고 계속할까요?");
-  return save(t);
+/** 저장 안 된 문서를 닫기 전에 묻는다: 저장 / 저장 안 함 / 취소. 계속 진행해도 되면 true. */
+async function askSave(t) {
+  if (!t.dirty) return true;
+  const answer = await ask(`"${nameOf(t)}" 문서에 저장하지 않은 내용이 있습니다. 저장할까요?`, ["저장", "저장 안 함", "취소"]);
+  if (answer === "취소" || answer === null) return false;
+  if (answer === "저장") return save(t);
+  return true;
 }
+
+/** 화면 안 작은 대화상자. buttons 중 누른 글을 돌려준다(Esc·바깥 누름은 null). 첫 단추가 기본(Enter). */
+function ask(message, buttons) {
+  return new Promise((done) => {
+    const back = el("div", "ask-back");
+    const box = el("div", "ask");
+    box.setAttribute("role", "dialog");
+    box.append(el("p", "ask-msg", message));
+    const row = el("div", "ask-row");
+    const finish = (v) => { back.remove(); document.removeEventListener("keydown", onKey, true); done(v); };
+    buttons.forEach((label, k) => {
+      const b = el("button", "btn" + (k === 0 ? "" : " ghost"), label);
+      b.onclick = () => finish(label);
+      row.append(b);
+    });
+    const onKey = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); finish(null); } };
+    document.addEventListener("keydown", onKey, true);
+    box.append(row);
+    back.append(box);
+    back.onclick = (ev) => { if (ev.target === back) finish(null); };
+    document.body.append(back);
+    row.firstChild.focus();
+  });
+}
+
+/** 창 닫기 요청(단추·Alt+F4·작업 표시줄): 저장 안 된 문서마다 묻고, 다 처리되면 진짜로 닫는다. */
+async function requestClose() {
+  for (const t of [...state.tabs]) {
+    if (!t.dirty) continue;
+    await activate(state.tabs.indexOf(t));
+    if (!(await askSave(t))) return false;
+  }
+  if (NATIVE && window.nm_win) window.nm_win("close-now");
+  return true;
+}
+window.nmRequestClose = requestClose;
 
 function followLink(href) {
   if (/^(https?:|mailto:)/i.test(href)) {
@@ -748,7 +777,7 @@ function setupTitlebar() {
   $("#tabs").addEventListener("mousedown", (ev) => { if (ev.target === $("#tabs")) drag(ev); });
   $("#win-min").onclick = () => win("min");
   $("#win-max").onclick = () => win("max");
-  $("#win-close").onclick = () => win("close");
+  $("#win-close").onclick = () => requestClose();
   // 위쪽 가장자리 5px: 창 높이 조절(제목 줄이 없어진 자리의 크기 조절 테두리 노릇)
   const edge = el("div", "resize-top");
   document.body.append(edge);
@@ -849,8 +878,8 @@ async function start() {
       setZoom(1);
     }
   });
-  window.addEventListener("beforeunload", (ev) => {
-    if (state.tabs.some((t) => t.dirty && (t.untitled || t.store?.kind !== "native"))) {
+  window.addEventListener("beforeunload", (ev) => { // 브라우저 판: 프로그램 창은 nmRequestClose가 묻는다
+    if (!NATIVE && state.tabs.some((t) => t.dirty)) {
       ev.preventDefault();
       ev.returnValue = "";
     }
