@@ -5,8 +5,8 @@ package edge
 import (
 	"unsafe"
 
-	"nongmak/internal/windows"
 	"nongmak/internal/w32"
+	"nongmak/internal/windows"
 )
 
 type _ICoreWebView2ControllerVtbl struct {

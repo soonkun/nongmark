@@ -22,7 +22,14 @@
 - 화면을 그리는 **WebView2 런타임**이 필요하다. Windows 11에는 기본으로 있고, Windows 10도 대부분 있다(Edge·Office가 함께 깐다). 없으면 농막이 그렇게 알려 주니, 전산 담당에게 "WebView2 런타임 오프라인 설치 파일(Evergreen Standalone x64)" 설치를 요청한다.
 
 ## 쓰는 법
-- **파일 메뉴**: 새 문서(Ctrl+N) · 열기(Ctrl+O) · 폴더 열기 · 저장(Ctrl+S) · 다른 이름으로 저장(Ctrl+Shift+S) · 인쇄/PDF(Ctrl+P). 연 문서가 든 폴더의 다른 .md 문서가 왼쪽 목록에 나온다.
+- **쪽 단위 편집(기본)**: 화면이 A4 쪽(210×297mm)으로 나뉘어 보인다. 여백은 좌우 20mm·위아래 30mm, 본문 11pt·줄 간격 160%(한글로 내보낼 때와 같다). 쪽 아래에 쪽 번호.
+  내용이 넘치면 다음 쪽으로 넘어가고, `/` 메뉴의 **쪽 나누기**로 원하는 곳에서 쪽을 나눈다(파일에는 `<!-- pagebreak -->`로 적힌다 - 다른 마크다운 뷰어에서는 보이지 않는 주석).
+- **확대·축소**: 문서 위에서 Ctrl+마우스 휠(30~200%), Ctrl+0은 100%, 오른쪽 아래 －/＋. 창 폭에 두 쪽 이상 들어갈 만큼 줄이면 쪽이 나란히 보인다.
+- **문서 목록**: 왼쪽 위 ☰ 로 열고, 목록 위의 ‹ 로 닫는다(스르륵 접힌다).
+- **파일 메뉴**: 새 문서(Ctrl+N) · 열기(Ctrl+O) · 폴더 열기 · 저장(Ctrl+S) · 다른 이름으로 저장(Ctrl+Shift+S) · **한글(hwpx)로 내보내기** · **PDF로 내보내기** · **인쇄**(Ctrl+P). 연 문서가 든 폴더의 다른 .md 문서가 왼쪽 목록에 나온다.
+- **한글(hwpx)로 내보내기**: A4·같은 여백의 한글 문서. 표는 한글의 진짜 표(머리 줄 굵게·연초록 바탕, 쪽을 넘으면 머리 줄 반복, 열 너비는 내용 비례, 정렬 반영)로 들어가고, 그림은 문서 안에 넣는다.
+  목록·할 일(☐/☑)·인용·콜아웃(색 상자)·코드(회색 상자)·구분선·쪽 나눔도 옮긴다. 글꼴은 맑은 고딕. 쪽 나눔 위치는 한글이 다시 계산하므로 화면과 조금 다를 수 있다.
+- **PDF·인쇄**: 화면의 쪽 그대로 A4로 나간다(인쇄 미리보기에서 프린터를 고른다). PDF는 인쇄 창의 프린터에서 "PDF로 저장"(또는 Microsoft Print to PDF)을 고른다 - Windows 10·11에 기본으로 있다.
 - **블록 편집**: 문단·제목·목록을 누르면 그 부분의 마크다운이 열리고, 밖을 누르거나 Esc면 다시 그려진다. 고친 내용은 곧바로 자동 저장.
 - **`/` 메뉴**: 빈 블록에서 `/` → 제목·목록·할 일·인용·콜아웃·코드·표·구분선.
 - Enter 다음 블록 · Shift+Enter 줄바꿈 · 목록에서 Enter 다음 항목(빈 항목이면 목록 끝) · Tab/Shift+Tab 들여쓰기 · 맨 앞 Backspace 앞 블록과 합치기 · ↑↓ 블록 이동 · Ctrl+B/I.
@@ -42,7 +49,9 @@
 ```
 python3 build.py                       # 금지 API 검사 → HTML·CSP → 아이콘(windres) → go test/vet → Windows exe → SHA256SUMS
 node --test tests/markdown.test.cjs    # 해석기 보안 시험
-../.tools/pw/bin/python tests/e2e.py   # 화면 시험(Chromium, 프로그램 함수는 가짜로)
+../.tools/pw/bin/python tests/e2e.py   # 화면 시험(Chromium, 프로그램 함수는 가짜로) - 쪽 나누기·두 쪽 보기·목록 접기·hwpx 내보내기
+node tests/hwpx.test.cjs build/sample.hwpx && python tests/hwpx_check.py build/sample.hwpx   # hwpx 구조 검증(python-hwpx)
 ```
+한글 문서 골격(`assets/hwpx-template`)은 python-hwpx(Apache-2.0)의 빈 문서에서 땄다.
 도구: Go 1.27.1(go.dev 공식, SHA-256 대조), `binutils-mingw-w64`의 windres(Ubuntu), 아이콘은 `make_icon.py`(Pillow).
 **아직 실제 Windows에서 돌려 보지 못했다** — 이 개발 서버에는 Windows가 없다. 첫 설치 때 창이 뜨는지, .md 더블클릭·저장이 되는지 확인이 필요하다.

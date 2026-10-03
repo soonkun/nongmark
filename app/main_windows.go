@@ -9,6 +9,8 @@ package main
 
 import (
 	_ "embed"
+	"encoding/base64"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,6 +115,24 @@ func main() {
 		return ws.Info()
 	})
 	must("nm_alert", func(text string) { showInfo(cut(text, 2000)) })
+	// 내보내기(hwpx 등): 사용자가 저장 창에서 고른 곳에만 쓴다. 확장자는 hwpx·pdf만.
+	must("nm_saveBytes", func(suggest, ext, b64 string) (string, error) {
+		if ext != "hwpx" && ext != "pdf" {
+			return "", errors.New("내보낼 수 없는 형식입니다")
+		}
+		data, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil || len(data) > 200<<20 {
+			return "", errors.New("내보낼 내용을 읽지 못했습니다")
+		}
+		p := fileDialog(hwnd(w), true, suggest, ext)
+		if p == "" {
+			return "", nil
+		}
+		if !strings.EqualFold(filepath.Ext(p), "."+ext) {
+			p += "." + ext
+		}
+		return p, os.WriteFile(p, data, 0o644)
+	})
 	w.Init("window.NONGMAK_NATIVE = true;")
 	w.SetHtml(page)
 	w.Run()

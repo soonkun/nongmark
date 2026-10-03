@@ -26,7 +26,7 @@
 
 <div id="app" class="app" hidden>
   <aside class="side">
-    <div class="brand"><img src="{{ICON64}}" alt=""><span>새싹이의 농막</span></div>
+    <div class="brand"><img src="{{ICON64}}" alt=""><span>새싹이의 농막</span><button id="btn-side-close" class="icon-btn chevron" title="목록 닫기">‹</button></div>
     <div class="side-head">
       <span id="rootname" class="rootname"></span>
       <button id="btn-folder" class="icon-btn" title="다른 폴더 열기">폴더 바꾸기</button>
@@ -40,6 +40,7 @@
   </aside>
   <main class="main">
     <div class="toolbar">
+      <button id="btn-side" class="icon-btn hamburger" title="문서 목록 열기·닫기" aria-label="문서 목록"><span></span><span></span><span></span></button>
       <div class="menu-wrap">
         <button id="btn-file" class="menu-btn">파일 ▾</button>
         <div id="filemenu" class="menu" hidden>
@@ -50,7 +51,10 @@
           <button id="m-save">저장<kbd>Ctrl+S</kbd></button>
           <button id="m-saveas">다른 이름으로 저장…<kbd>Ctrl+Shift+S</kbd></button>
           <hr>
-          <button id="m-print">인쇄 · PDF로 저장…<kbd>Ctrl+P</kbd></button>
+          <button id="m-hwpx">한글(hwpx)로 내보내기…</button>
+          <button id="m-pdf">PDF로 내보내기…</button>
+          <hr>
+          <button id="m-print">인쇄…<kbd>Ctrl+P</kbd></button>
         </div>
       </div>
       <div class="title"><span id="crumb" class="crumb"></span><span id="pagename" class="pagename"></span></div>
@@ -64,17 +68,18 @@
         <img src="{{ICON192}}" alt="">
         <p>왼쪽에서 문서를 고르거나 <b>＋ 새 페이지</b>를 만드세요.</p>
       </div>
-      <article id="page" class="page" hidden>
-        <div id="doc" class="doc"></div>
-        <textarea id="raw" class="raw" spellcheck="false" hidden></textarea>
-        <div id="doc-end" class="doc-end" title="눌러서 끝에 이어 쓰기"></div>
-      </article>
+      <div id="page" hidden>
+        <div id="doc" class="doc pages"></div>
+        <div id="raw-wrap" class="raw-wrap" hidden><textarea id="raw" class="raw" spellcheck="false"></textarea></div>
+      </div>
     </div>
     <footer class="statusbar">
       <span id="status" class="status">준비</span>
       <span class="sb-gap"></span>
+      <span class="sb-hint">/ 블록 넣기 · Esc 편집 끝 · Ctrl+휠 확대</span>
+      <span id="pages" class="count"></span>
       <span id="count" class="count"></span>
-      <span class="sb-hint">/ 블록 넣기 · Esc 편집 끝</span>
+      <span class="zoom"><button id="zoom-out" class="icon-btn" title="축소">－</button><button id="zoom-val" class="icon-btn" title="100%로">100%</button><button id="zoom-in" class="icon-btn" title="확대">＋</button></span>
     </footer>
   </main>
 </div>

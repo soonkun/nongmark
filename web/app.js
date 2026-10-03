@@ -94,6 +94,7 @@ function folderStore(dir) {
     async mkdir(p) { await walk(p + "/x", true); },
     async saveAsset(name, blob) { const p = "assets/" + name; await write(p, blob); return p; },
     async imageUrl(p) { return URL.createObjectURL(await (await fileHandle(p)).getFile()); },
+    async imageBytes(p) { return new Uint8Array(await (await (await fileHandle(p)).getFile()).arrayBuffer()); },
   };
 }
 
@@ -127,6 +128,7 @@ const state = {
   entries: [],
   path: null, // 지금 연 파일
   untitled: false, // 아직 저장한 적 없는 새 문서
+  zoom: 1,
   blocks: [],
   dirty: false,
   editing: -1,
@@ -279,12 +281,46 @@ async function flush() {
 
 /* ---------------- 그리기 ---------------- */
 
+/* 쪽 보기: A4(210×297mm), 여백 좌우 20mm·위아래 30mm. 블록을 차례로 쪽에 담다가 넘치면 다음 쪽으로 넘긴다.
+   <!-- pagebreak --> 블록 뒤는 무조건 새 쪽. 한 쪽보다 긴 블록(아주 긴 표 등)은 그 쪽이 늘어난다(인쇄 때 다음 장으로 이어짐). */
+function newSheet(doc) {
+  const sheet = el("section", "sheet");
+  const body = el("div", "sheet-body");
+  const no = el("div", "sheet-no");
+  sheet.append(body, no);
+  doc.append(sheet);
+  return body;
+}
+
+function paginate() {
+  const doc = $("#doc");
+  const sheets = [...doc.querySelectorAll(".sheet")];
+  const blocks = sheets.flatMap((sh) => [...sh.querySelector(".sheet-body").children]);
+  doc.textContent = "";
+  let body = newSheet(doc);
+  const limit = () => body.clientHeight;
+  for (const b of blocks) {
+    body.append(b);
+    if (body.childElementCount > 1 && b.offsetTop + b.offsetHeight > limit()) {
+      b.remove();
+      body = newSheet(doc);
+      body.append(b);
+    }
+    if (b.querySelector("[data-pagebreak]")) body = newSheet(doc);
+  }
+  const all = doc.querySelectorAll(".sheet");
+  all.forEach((sh, n) => (sh.querySelector(".sheet-no").textContent = `- ${n + 1} -`));
+  $("#pages").textContent = `${all.length}쪽`;
+}
+
 function renderDoc() {
   const doc = $("#doc");
   doc.textContent = "";
   if (!state.blocks.length) state.blocks = [""];
-  state.blocks.forEach((md, i) => doc.append(blockView(md, i)));
-  loadImages(doc);
+  const body = newSheet(doc);
+  state.blocks.forEach((md, i) => body.append(blockView(md, i)));
+  paginate();
+  loadImages(doc).then(() => { if (state.editing < 0) paginate(); }); // 그림이 들어오면 높이가 바뀐다
   countChars();
 }
 
@@ -324,7 +360,7 @@ function blockView(md, i) {
   return wrap;
 }
 
-async function loadImages(root) {
+async function loadImages(root) { // 끝나면 resolve(쪽 다시 나누기용)
   for (const img of root.querySelectorAll("img[data-src]")) {
     const rel = resolvePath(img.dataset.src);
     if (!rel) continue;
@@ -528,6 +564,7 @@ const SLASH_ITEMS = [
   ["코드", "고정폭 코드 블록", "```\n\n```", 4],
   ["표", "2열 표", "| 항목 | 내용 |\n| --- | --- |\n|  |  |", 2],
   ["구분선", "가로줄", "---"],
+  ["쪽 나누기", "여기서 다음 쪽으로", "<!-- pagebreak -->"],
 ];
 const slash = { open: false, items: [], index: 0 };
 
@@ -627,7 +664,7 @@ function toggleRaw() {
     state.blocks = MD.splitBlocks($("#raw").value);
     renderDoc();
   }
-  $("#raw").hidden = !state.raw;
+  $("#raw-wrap").hidden = !state.raw;
   $("#doc").hidden = state.raw;
   $("#btn-raw").classList.toggle("on", state.raw);
   if (state.raw) autosize($("#raw"));
@@ -700,6 +737,68 @@ async function deletePage() {
   } catch (e) {
     status("지우지 못했습니다: " + e.message, "error");
   }
+}
+
+/* ---------------- 내보내기: 한글(hwpx)·PDF·인쇄 ---------------- */
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function bytesToB64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/** 그림 바이트(한글 문서에 넣을 것). 문서 기준 상대 경로 → 폴더 안 그림만. */
+async function imageBytes(src) {
+  const img = MD_SAFE_IMAGE(src);
+  if (!img) return null;
+  if (img.kind === "data") return b64ToBytes(img.src.split(",")[1].replace(/\s/g, ""));
+  const rel = resolvePath(img.src);
+  if (!rel || !state.store) return null;
+  if (state.store.imageBytes) return state.store.imageBytes(rel);
+  const url = await state.store.imageUrl(rel);
+  return url.startsWith("data:") ? b64ToBytes(url.split(",")[1]) : null;
+}
+
+function docName() {
+  if (state.path) return state.path.split("/").pop().replace(MD_EXT, "");
+  return (MD.titleOf(docText()) || "새 문서").replace(/[\\/:*?"<>|]/g, " ").trim().slice(0, 60) || "새 문서";
+}
+
+async function saveBytes(bytes, name, ext) {
+  if (NATIVE) {
+    const where = await window.nm_saveBytes(name + "." + ext, ext, bytesToB64(bytes));
+    if (where) status(`${ext.toUpperCase()}로 저장했습니다: ${where}`, "ok");
+    return;
+  }
+  const a = el("a");
+  a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+  a.download = name + "." + ext;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+async function exportHwpx() {
+  commitEdit();
+  status("한글 문서를 만드는 중…");
+  try {
+    const bytes = await HWPX.build(docText(), { template: HWPX_TEMPLATE, title: docName(), readImage: imageBytes });
+    await saveBytes(bytes, docName(), "hwpx");
+  } catch (e) {
+    status("한글 문서로 내보내지 못했습니다: " + (e.message || e), "error");
+  }
+}
+
+function printDoc(pdfHint) {
+  commitEdit();
+  if (pdfHint) status("인쇄 창의 '프린터'에서 'PDF로 저장'(또는 Microsoft Print to PDF)을 고르세요.");
+  setTimeout(() => window.print(), 50);
 }
 
 /* ---------------- 파일 메뉴 (한글·워드처럼) ---------------- */
@@ -875,6 +974,20 @@ async function recallFolder() {
   }
 }
 
+function setZoom(z) {
+  state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 10) / 10;
+  $("#doc").style.zoom = state.zoom;
+  $("#raw-wrap").style.zoom = state.zoom;
+  $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
+}
+
+function toggleSide(open) {
+  const app = $("#app");
+  const show = open ?? app.classList.contains("side-closed");
+  app.classList.toggle("side-closed", !show);
+  try { localStorage.setItem("nongmak.side", show ? "1" : "0"); } catch { /* 무시 */ }
+}
+
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $("#btn-theme").textContent = theme === "dark" ? "밝게" : "어둡게";
@@ -897,7 +1010,8 @@ async function start() {
   document.addEventListener("click", () => toggleMenu(false));
   const menu = {
     "m-new": newDocument, "m-open": openDialog, "m-folder": pickFolder,
-    "m-save": () => { state.dirty = true; save(); }, "m-saveas": saveAs, "m-print": () => window.print(),
+    "m-save": () => { state.dirty = true; save(); }, "m-saveas": saveAs,
+    "m-hwpx": exportHwpx, "m-pdf": () => printDoc(true), "m-print": () => printDoc(false),
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
   $("#btn-new").onclick = newPage;
@@ -911,12 +1025,26 @@ async function start() {
     autosize($("#raw"));
     changed();
   };
-  $("#doc-end").onclick = () => {
-    // 문서 끝 빈 곳을 누르면 마지막에 블록을 더한다
+  $("#doc").addEventListener("click", (ev) => {
+    // 마지막 쪽의 빈 곳(블록 아래)을 누르면 끝에 이어 쓴다
+    const body = ev.target.closest(".sheet-body") || ev.target.closest(".sheet")?.querySelector(".sheet-body");
+    if (!body || ev.target.closest(".block") || body !== [...document.querySelectorAll(".sheet-body")].pop()) return;
     if (state.blocks[state.blocks.length - 1]?.trim()) state.blocks.push("");
     renderDoc();
     editBlock(state.blocks.length - 1);
-  };
+  });
+  // 확대·축소: 문서 위에서 Ctrl+휠, Ctrl+0은 100%. 작게 하면 쪽이 나란히 두 장 이상 보인다.
+  $(".desk").addEventListener("wheel", (ev) => {
+    if (!ev.ctrlKey) return;
+    ev.preventDefault();
+    setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
+  }, { passive: false });
+  $("#zoom-in").onclick = () => setZoom(state.zoom + 0.1);
+  $("#zoom-out").onclick = () => setZoom(state.zoom - 0.1);
+  $("#zoom-val").onclick = () => setZoom(1);
+  $("#btn-side").onclick = () => toggleSide();
+  $("#btn-side-close").onclick = () => toggleSide(false);
+  try { if (localStorage.getItem("nongmak.side") === "0") toggleSide(false); } catch { /* 무시 */ }
   document.addEventListener("keydown", (ev) => {
     if (!(ev.ctrlKey || ev.metaKey)) return;
     const k = ev.key.toLowerCase();
@@ -934,8 +1062,10 @@ async function start() {
       newDocument();
     } else if (k === "p") {
       ev.preventDefault();
-      commitEdit();
-      window.print();
+      printDoc(false);
+    } else if (k === "0") {
+      ev.preventDefault();
+      setZoom(1);
     }
   });
   window.addEventListener("beforeunload", (ev) => {

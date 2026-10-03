@@ -67,6 +67,37 @@ function inline(src, depth = 0) {
   return out + esc(src.slice(last));
 }
 
+/** 한 줄 안의 꾸밈을 HTML이 아니라 조각 목록으로 - 한글(hwpx) 내보내기가 쓴다.
+ * 조각: {text, b, i, s, code, link, image:{alt, src}}. 규칙은 inline()과 같다(같은 정규식). */
+function inlineRuns(src, style = {}, depth = 0) {
+  const out = [];
+  const push = (text, extra = {}) => text && out.push({ ...style, ...extra, text });
+  if (depth > 8 || src.length > MAX_INLINE) {
+    push(src);
+    return out;
+  }
+  const re = new RegExp(INLINE.source, "g");
+  let last = 0;
+  let m;
+  while ((m = re.exec(src))) {
+    push(src.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[1] !== undefined) push(m[2], { code: true });
+    else if (m[4] !== undefined) out.push({ ...style, text: "", image: { alt: m[3], src: m[4] } });
+    else if (m[6] !== undefined) {
+      const url = safeUrl(m[6]);
+      if (url) out.push(...inlineRuns(m[5], { ...style, link: url }, depth + 1));
+      else push(m[0]);
+    } else if (m[7] !== undefined || m[8] !== undefined) out.push(...inlineRuns(m[7] ?? m[8], { ...style, b: true }, depth + 1));
+    else if (m[9] !== undefined) out.push(...inlineRuns(m[9], { ...style, s: true }, depth + 1));
+    else if (m[10] !== undefined || m[11] !== undefined) out.push(...inlineRuns(m[10] ?? m[11], { ...style, i: true }, depth + 1));
+    else if (m[12] !== undefined) push(m[12], { link: m[12] });
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  push(src.slice(last));
+  return out;
+}
+
 const RE = {
   fence: /^(\s*)(```+|~~~+)(.*)$/,
   heading: /^(#{1,6})\s+(.*)$/, // 끝의 # 은 headingText()가 지운다 - 정규식으로 하면 공백이 긴 줄에서 세제곱 시간(독립 검토)
@@ -74,6 +105,7 @@ const RE = {
   list: /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/,
   quote: /^\s*>/,
   table: /^\s*\|/,
+  pagebreak: /^\s*<!--\s*pagebreak\s*-->\s*$/i, // 쪽 나눔(마크다운에는 쪽이 없어 주석으로 적는다 - 다른 뷰어에서는 안 보인다)
 };
 
 /** 문서를 블록(편집 단위)으로 나눈다. 빈 줄이 블록을 가르고, 코드 블록·제목·구분선은 혼자 한 블록. */
@@ -110,7 +142,7 @@ function splitBlocks(text) {
       flush();
       continue;
     }
-    if (RE.heading.test(line) || RE.hr.test(line)) {
+    if (RE.heading.test(line) || RE.hr.test(line) || RE.pagebreak.test(line)) {
       flush();
       blocks.push(line);
       continue;
@@ -181,6 +213,7 @@ function renderBlock(md, depth = 0) {
     const lang = fence[3].trim().split(/\s/)[0];
     return `<pre${lang ? ` data-lang="${esc(lang)}"` : ""}><code>${esc(code)}</code></pre>`;
   }
+  if (RE.pagebreak.test(first) && lines.length === 1) return '<div class="pagebreak" data-pagebreak="1"><span>쪽 나눔</span></div>';
   const h = first.match(RE.heading);
   if (h && lines.length === 1) return `<h${h[1].length}>${inline(headingText(h[2]))}</h${h[1].length}>`;
   if (RE.hr.test(first) && lines.length === 1) return "<hr>";
@@ -217,4 +250,4 @@ function titleOf(text) {
   return (m ? m[1] : String(text).split("\n").find((l) => l.trim()) || "").trim().slice(0, 80);
 }
 
-if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf };
+if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, inlineRuns, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf, headingText, RE };

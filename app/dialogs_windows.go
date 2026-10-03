@@ -54,22 +54,36 @@ const (
 	ofnExplorer        = 0x00080000
 )
 
-// 필터 문자열: "설명\0패턴\0…\0\0"
-func filter() *uint16 {
-	s := "마크다운 문서 (*.md)\x00*.md;*.markdown\x00모든 파일\x00*.*\x00\x00"
-	u, _ := syscall.UTF16FromString(s)
-	return &u[0]
+// 필터 문자열: "설명\0패턴\0…\0\0" - UTF16FromString은 NUL을 거절하므로 직접 만든다
+func filter(ext string) *uint16 {
+	pairs := map[string][2]string{
+		"md":   {"마크다운 문서 (*.md)", "*.md;*.markdown"},
+		"hwpx": {"한글 문서 (*.hwpx)", "*.hwpx"},
+		"pdf":  {"PDF 문서 (*.pdf)", "*.pdf"},
+	}
+	p := pairs[ext]
+	var u []uint16
+	for _, part := range []string{p[0], p[1], "모든 파일", "*.*"} {
+		u = append(u, utf16(part)...)
+		u = append(u, 0)
+	}
+	return &append(u, 0)[0]
 }
 
-func fileDialog(owner uintptr, save bool, suggest string) string {
+func utf16(s string) []uint16 {
+	u, _ := syscall.UTF16FromString(s)
+	return u[:len(u)-1]
+}
+
+func fileDialog(owner uintptr, save bool, suggest, ext string) string {
 	buf := make([]uint16, 4096)
 	if suggest != "" {
 		s, _ := syscall.UTF16FromString(suggest)
 		copy(buf, s)
 	}
-	defExt, _ := syscall.UTF16PtrFromString("md")
+	defExt, _ := syscall.UTF16PtrFromString(ext)
 	ofn := openFileNameW{
-		owner: owner, filter: filter(), filterIndex: 1, file: &buf[0], maxFile: uint32(len(buf)), defExt: defExt,
+		owner: owner, filter: filter(ext), filterIndex: 1, file: &buf[0], maxFile: uint32(len(buf)), defExt: defExt,
 		flags: ofnExplorer | ofnPathMustExist | ofnNoChangeDir,
 	}
 	ofn.structSize = uint32(unsafe.Sizeof(ofn))
@@ -86,8 +100,10 @@ func fileDialog(owner uintptr, save bool, suggest string) string {
 	return syscall.UTF16ToString(buf)
 }
 
-func openFileDialog(owner uintptr) string                 { return fileDialog(owner, false, "") }
-func saveFileDialog(owner uintptr, suggest string) string { return fileDialog(owner, true, suggest) }
+func openFileDialog(owner uintptr) string { return fileDialog(owner, false, "", "md") }
+func saveFileDialog(owner uintptr, suggest string) string {
+	return fileDialog(owner, true, suggest, "md")
+}
 
 type browseInfoW struct {
 	owner       uintptr

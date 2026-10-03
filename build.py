@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -34,7 +35,8 @@ FORBIDDEN = [
     (r"\bimportScripts\b|\bimport\s*\(|\bnew\s+Worker\b|SharedWorker|serviceWorker", "외부 코드 불러오기"),
     (r"document\.write|insertAdjacentHTML|outerHTML\s*=|\.srcdoc\b|createContextualFragment", "HTML 주입 경로"),
     (r"postMessage|\bwindow\.open\s*\(|\bopener\b\s*\.|\blocation\s*=|location\.(href|assign|replace)\b", "다른 창·주소로 보내기"),
-    (r"https?://[a-z0-9-]+\.[a-z0-9.-]+", "외부 주소 문자열"),
+    # 한글 문서 XML의 이름공간(namespace) 식별자는 주소 모양이지만 연결하지 않는 이름일 뿐이라 뺀다
+    (r"https?://(?!www\.hancom\.co\.kr/(hwpml|schema)/|www\.idpf\.org/20|purl\.org/dc/|www\.w3\.org/)[a-z0-9-]+\.[a-z0-9.-]+", "외부 주소 문자열"),
     (r"\bdocument\.cookie\b", "쿠키 사용"),
 ]
 
@@ -62,9 +64,15 @@ def data_uri(name: str) -> str:
 def build_html() -> Path:
     markdown = (WEB / "markdown.js").read_text(encoding="utf-8")
     app = (WEB / "app.js").read_text(encoding="utf-8")
+    hwpx = (WEB / "hwpx.js").read_text(encoding="utf-8")
+    T = ASSETS / "hwpx-template"
+    template = {k: (T / f).read_text(encoding="utf-8") for k, f in [("header", "header.xml"), ("section", "section0.xml"), ("version", "version.xml"),
+                ("settings", "settings.xml"), ("container", "container.xml"), ("containerRdf", "container.rdf"), ("manifest", "manifest.xml")]}
     # markdown.js를 함수 안에 가둬 전역에는 MD 하나만 남긴다
     script = "\nconst MD = (() => {\n" + markdown.replace("if (typeof module", "// node 시험용 내보내기\n  if (false && typeof module") + \
-        "\nreturn { splitBlocks, renderBlock, toggleTask, titleOf };\n})();\n" + app + "\n"
+        "\nreturn { splitBlocks, renderBlock, toggleTask, titleOf, inlineRuns, safeImage, headingText, RE };\n})();\n" + \
+        "const MDX = MD;\nconst MD_SAFE_IMAGE = MD.safeImage;\nconst HWPX_TEMPLATE = " + json.dumps(template, ensure_ascii=False).replace("</", "<\\/") + ";\n" + \
+        hwpx.replace("if (typeof module", "if (false && typeof module") + "\n" + app + "\n"
     check(script)
     style = "\n" + (WEB / "style.css").read_text(encoding="utf-8")
     csp = "; ".join([

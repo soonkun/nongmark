@@ -9,8 +9,8 @@ import (
 
 	"nongmak/internal/w32"
 
-	"nongmak/internal/windows"
 	webviewloader "nongmak/internal/loader"
+	"nongmak/internal/windows"
 )
 
 func init() {

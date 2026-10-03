@@ -47,8 +47,14 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .note { color: var(--muted); font-size: 12.5px; margin: 16px 0 0; line-height: 1.6; }
 
 /* 편집 화면 */
-.app { display: grid; grid-template-columns: 268px 1fr; height: 100%; }
-.side { background: var(--cream); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.app { display: grid; grid-template-columns: 268px 1fr; height: 100%; transition: grid-template-columns .25s ease; }
+.app.side-closed { grid-template-columns: 0 1fr; }
+.side { background: var(--cream); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; transition: opacity .2s; }
+.app.side-closed .side { opacity: 0; pointer-events: none; }
+.chevron { margin-left: auto; font-size: 20px; line-height: 1; padding: 0 8px 3px; }
+.hamburger { display: inline-flex; flex-direction: column; justify-content: center; gap: 3px; width: 32px; height: 30px; padding: 0 8px; }
+.hamburger span { display: block; height: 2px; border-radius: 1px; background: var(--muted); }
+.hamburger:hover span { background: var(--green); }
 .brand { display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px; font-weight: 800; color: var(--green-d); letter-spacing: -.01em; }
 .brand img { width: 30px; height: 30px; }
 .side-head { display: flex; align-items: center; gap: 6px; padding: 2px 8px 6px 14px; border-top: 1px dashed var(--wood); margin: 0 6px; padding-top: 10px; }
@@ -81,11 +87,19 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .menu button:hover { background: var(--green-soft); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 6px; }
 
-.desk { overflow: auto; min-height: 0; padding: 28px 24px 0; }
-.page { max-width: 860px; margin: 0 auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); padding: 48px 72px 40px; min-height: calc(100% - 28px); }
+.desk { overflow: auto; min-height: 0; padding: 24px 20px 40px; }
+/* 쪽: A4 210×297mm, 여백 좌우 20mm·위아래 30mm. 글자 크기는 pt로(한글 내보내기와 같은 11pt). 작게 확대하면 여러 쪽이 나란히. */
+.pages { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 24px; }
+.sheet { position: relative; width: 210mm; min-height: 297mm; padding: 30mm 20mm; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); flex: none; }
+.sheet-body { height: 237mm; font-size: 11pt; line-height: 1.6; }
+.sheet-no { position: absolute; left: 0; right: 0; bottom: 12mm; text-align: center; font-size: 9pt; color: var(--muted); }
+.pagebreak { margin: 10px 0; border-top: 1px dashed var(--wood-d); text-align: center; height: 0; }
+.pagebreak span { position: relative; top: -.8em; background: var(--paper); color: var(--muted); font-size: 8.5pt; padding: 0 8px; }
+.raw-wrap { width: 210mm; margin: 0 auto; }
+.zoom { display: inline-flex; align-items: center; }
+.zoom .icon-btn { padding: 0 6px; font-size: 12px; }
 .empty-page { display: grid; justify-items: center; gap: 8px; color: var(--muted); padding: 12vh 24px; text-align: center; }
 .empty-page img { width: 112px; height: 112px; opacity: .95; }
-.doc-end { min-height: 24vh; cursor: text; }
 
 .statusbar { display: flex; align-items: center; gap: 14px; padding: 4px 14px; font-size: 12px; color: var(--muted); background: var(--cream); border-top: 1px solid var(--line); }
 .sb-gap { flex: 1; }
@@ -107,7 +121,8 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
   font: 14px/1.65 "D2Coding", "Consolas", "Malgun Gothic", monospace; }
 
 /* 본문 */
-.doc { word-break: keep-all; overflow-wrap: anywhere; }
+.doc { word-break: keep-all; overflow-wrap: anywhere; color: var(--ink); }
+.doc .block { cursor: text; }
 .doc h1 { font-size: 2.05em; line-height: 1.25; margin: .2em 0 .35em; letter-spacing: -.02em; color: var(--ink); }
 .doc h1:first-child { padding-bottom: .35em; border-bottom: 2px solid var(--green-soft); }
 .doc h2 { font-size: 1.45em; line-height: 1.3; margin: 1.1em 0 .25em; letter-spacing: -.01em; }
@@ -152,9 +167,14 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
   .block-add, .sb-hint { display: none; }
   .welcome-actions { grid-template-columns: 1fr; }
 }
+@page { size: A4; margin: 0; }
 @media print {
-  html, body, .desk { background: #fff; }
-  .side, .toolbar, .statusbar, .block-add, .doc-end { display: none !important; }
+  html, body, .desk { background: #fff !important; height: auto; }
+  .side, .toolbar, .statusbar, .block-add, .pagebreak span { display: none !important; }
+  .pagebreak { border: 0; }
   .app { display: block; } .main { display: block; } .desk { padding: 0; overflow: visible; }
-  .page { box-shadow: none; border: 0; padding: 0; max-width: none; }
+  .pages { display: block; zoom: 1 !important; }
+  .sheet { box-shadow: none; border: 0; margin: 0; break-after: page; }
+  .sheet:last-child { break-after: auto; }
+  .block:hover { background: none; }
 }
