@@ -5,8 +5,9 @@
 묶을 때 하는 일:
   1) 금지 API 검사 - 스크립트에 eval·Function·fetch·XMLHttpRequest·WebSocket·외부 주소 등이 있으면 빌드를 멈춘다.
   2) CSP - 스크립트·스타일은 SHA-256 해시가 맞는 것만 실행·적용, 연결(connect-src)은 'none'.
-  3) exe - Go 표준 라이브러리 + golang.org/x/sys + 직접 들여와 검토한 WebView2 COM 래퍼(app/internal). 아이콘·버전 정보 포함.
-  4) 결과물의 SHA-256을 SHA256SUMS.txt에 적는다 - 내부망에서 `certutil -hashfile 파일 SHA256`으로 대조한다.
+  3) exe - Go 표준 라이브러리 + 직접 들여와 검토한 WebView2 COM 래퍼(app/internal). 아이콘·버전 정보 포함.
+  4) 설치 프로그램 nongmark-setup.exe - NSIS(installer/nongmark.nsi). exe·WebView2Loader.dll을 품고 범위 선택·바로 가기·연결·제거를 맡는다.
+  5) 결과물의 SHA-256을 SHA256SUMS.txt에 적는다 - 내부망에서 `certutil -hashfile 파일 SHA256`으로 대조한다.
 """
 from __future__ import annotations
 
@@ -156,14 +157,19 @@ def build_exe() -> list[Path]:
     return [exe, DIST / "WebView2Loader.dll"]
 
 
+def build_setup() -> Path:
+    """NSIS(makensis, Ubuntu nsis 패키지)로 설치 프로그램을 만든다: 범위 선택·바로 가기·.md 연결·앱 및 기능 항목·제거 프로그램."""
+    subprocess.run(["makensis", "-V2", "nongmark.nsi"], cwd=ROOT / "installer", check=True)
+    return DIST / "nongmark-setup.exe"
+
+
 def main() -> None:
     for old in DIST.glob("*"):
         old.unlink()
     html = build_html()
     outs = [html] + ([] if "--html-only" in sys.argv else build_exe())
-    for extra in (ROOT / "scripts").iterdir():
-        shutil.copy(extra, DIST / extra.name)
-        outs.append(DIST / extra.name)
+    if "--html-only" not in sys.argv:
+        outs.append(build_setup())
     sums = "".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in sorted(set(outs)))
     (DIST / "SHA256SUMS.txt").write_text(sums, encoding="utf-8")
     print(sums, end="")

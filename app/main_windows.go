@@ -25,7 +25,8 @@ import (
 var page string
 
 func main() {
-	if handleFlags(os.Args[1:]) {
+	if len(os.Args) > 1 && (os.Args[1] == "--install" || os.Args[1] == "--uninstall") {
+		showError("설치·제거는 설치 프로그램(nongmark-setup.exe)이나 설정 > 앱에서 합니다.") // 옛 install.cmd 호환 안내
 		return
 	}
 	if v, err := loader.RuntimeVersion(); err != nil || v == "" {

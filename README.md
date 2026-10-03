@@ -7,22 +7,22 @@
 
 | 파일 | 쓰임 |
 |---|---|
-| `nongmark.exe` | 프로그램(영어 이름 nongmark). 아이콘·버전 정보 포함 |
-| `WebView2Loader.dll` | 마이크로소프트가 서명한 WebView2 연결 파일(NuGet `Microsoft.Web.WebView2` 1.0.4258.31). exe와 같은 폴더에 둔다 |
-| `install.cmd` / `uninstall.cmd` | 설치 / 제거. 설치 때 범위(모든 사용자 = Program Files·관리자 승인 / 현재 사용자 = 승인 없음)와 바탕화면 바로 가기를 묻는다 |
+| `nongmark-setup.exe` | **설치 프로그램**(약 2MB). 안에 프로그램과 마이크로소프트가 서명한 WebView2Loader.dll(NuGet `Microsoft.Web.WebView2` 1.0.4258.31)이 들어 있다 |
 | `nongmark.html` | 프로그램 없이 Edge·Chrome으로 여는 판(파일 하나 열기·내려받기 저장) |
-| `SHA256SUMS.txt` | 위 파일들의 SHA-256 — `certutil -hashfile nongmark.exe SHA256`으로 대조 |
+| `SHA256SUMS.txt` | 위 파일들의 SHA-256 — `certutil -hashfile nongmark-setup.exe SHA256`으로 대조 |
+
+(`nongmark.exe`·`WebView2Loader.dll`도 dist/에 남아 있다 - 설치 없이 폴더째 두고 쓰는 휴대용. 두 파일이 같은 폴더에 있어야 한다.)
 
 ## 설치 (한 번)
-이전 이름(nongmak.exe, `Programs\Nongmak`)으로 설치했던 PC는 새 `install.cmd`가 옛 등록을 지우고 새로 등록한다. 옛 폴더 `%LOCALAPPDATA%\Programs\Nongmak`은 손으로 지우면 된다.
-
-1. 여섯 파일을 한 폴더에 둔다(예: USB → 바탕화면\농막). 해시를 대조한다.
-2. `install.cmd` 더블클릭 → 묻는 대로 고른다: **모든 사용자용**(`C:\Program Files\Nongmark`, 관리자 승인 창이 뜬다) 또는 **현재 사용자만**(`%LOCALAPPDATA%\Programs\Nongmark`, 승인 없음) → **바탕화면 바로 가기** 여부.
-   시작 메뉴 바로 가기와 **설정 > 앱("앱 및 기능")** 항목은 늘 만든다 - 제거는 거기서(또는 `uninstall.cmd`). 제거하면 바로 가기·연결·설치 폴더가 지워지고 문서(.md)는 남는다.
-3. `.md` 파일을 더블클릭하면 농막 창으로 열린다.
+1. `nongmark-setup.exe`를 실행한다(USB → 바탕화면 등). 해시를 대조한다.
+   - 처음 실행할 때 파란 "**Windows의 PC 보호**"(SmartScreen) 창이 뜰 수 있다 - 서명 없는 새 프로그램이라는 뜻이지 악성 판정이 아니다. **추가 정보 → 실행**.
+     인터넷에서 받은 zip이라면 풀기 전에 zip 오른쪽 단추 → 속성 → **차단 해제**를 하면 안 뜬다. USB로 옮긴 파일에는 보통 뜨지 않는다.
+2. 설치 마법사: 시작 → **설치 범위**(모든 사용자 = `C:\Program Files\Nongmark`, 관리자 승인 / 현재 사용자만 = `%LOCALAPPDATA%\Programs\Nongmark`, 승인 없음) →
+   폴더 → 구성 요소(시작 메뉴·바탕화면 바로 가기 선택) → 설치 → 끝(바로 실행 선택).
+3. `.md` 파일을 더블클릭하면 농막 창으로 열린다(탐색기 아이콘은 접힌 종이 꼴, 프로그램은 네모 꼴).
    - 이미 다른 프로그램으로 열리게 정해져 있었다면 한 번만: 파일 오른쪽 단추 → **연결 프로그램** → **다른 앱 선택** → **새싹이의 농막** → **항상 이 앱 사용**. (Windows가 사용자가 고른 연결을 프로그램이 바꾸지 못하게 막는다.)
-   - 처음 실행할 때 파란 "**Windows의 PC 보호**"(SmartScreen) 창이 뜰 수 있다 - 서명 없는 새 프로그램이라는 뜻이지 악성 판정이 아니다. **추가 정보 → 실행**을 누르면 그 PC에서는 다시 묻지 않는다.
-     아예 안 뜨게 하려면 **zip을 풀기 전에** zip 파일 오른쪽 단추 → 속성 → **차단 해제** 체크(안의 파일 전부에서 "인터넷에서 가져옴" 표시가 사라진다). USB로 옮긴 파일에는 보통 뜨지 않는다.
+- **제거**: 설정 > 앱 > "새싹이의 농막" (또는 설치 폴더의 `uninstall.exe`). 바로 가기·연결·설치 폴더가 지워지고 문서(.md)는 남는다.
+  WebView2 캐시(`%LOCALAPPDATA%\Nongmark`)는 남으니 필요하면 손으로 지운다. 옛 이름(nongmak)으로 설치했던 등록은 설치 때 정리된다.
 - 화면을 그리는 **WebView2 런타임**이 필요하다. Windows 11에는 기본으로 있고, Windows 10도 대부분 있다(Edge·Office가 함께 깐다). 없으면 농막이 그렇게 알려 주니, 전산 담당에게 "WebView2 런타임 오프라인 설치 파일(Evergreen Standalone x64)" 설치를 요청한다.
 
 ## 쓰는 법
@@ -66,7 +66,7 @@
   WebMessage는 about:blank에서 온 것만 받는다. 화면 쪽에서도 모든 링크 클릭·파일 드롭의 기본 동작을 막고 `window.open`을 빈 함수로 덮는다.
   최근 문서 목록은 프로그램이 `%LOCALAPPDATA%\Nongmark\recent.json`에 보관하고 화면은 번호로만 고른다(화면이 임의 경로를 열 수 없다). 탭을 다 닫은 폴더는 등록을 푼다.
 - **창**: 시스템 제목 줄은 WM_NCCALCSIZE로 위쪽만 떼어 냈다(창 스타일은 그대로라 테두리·그림자·화면 끝 붙이기 유지). 화면이 부탁하는 창 조작(`nm_win`)은 끌기·위쪽 크기 조절·최소화·최대화·닫기뿐.
-- **설치**: 서비스·시작 프로그램·예약 작업 등록 없음. 레지스트리는 파일 연결 키(`Software\Classes`)와 "앱 및 기능" 항목(`…\Uninstall\Nongmark`)뿐이고, 범위는 사용자가 고른다(모든 사용자 = HKLM·Program Files, 관리자 승인 1회 / 현재 사용자 = HKCU·LOCALAPPDATA). 전부 `app/install_windows.go`에 있다. 시스템 DLL은 System32 전체 경로로만.
+- **설치**: NSIS 설치 프로그램(`installer/nongmark.nsi`, 전부 그 파일에 있다). 서비스·시작 프로그램·예약 작업 등록 없음. 레지스트리는 파일 연결 키(`Software\Classes`)와 "앱 및 기능" 항목(`…\Uninstall\Nongmark`)뿐이고, 범위는 사용자가 고른다(모든 사용자 = HKLM·Program Files, 관리자 승인 1회 / 현재 사용자 = HKCU·LOCALAPPDATA). 프로그램 자체에는 설치 코드가 없다. 시스템 DLL은 System32 전체 경로로만.
 - **CSP**: 스크립트는 해시가 맞는 두 덩이(편집기 묶음, 화면 코드)만 돈다. 스타일은 `'unsafe-inline'`을 허용한다 - 편집기가 글자색·표 너비·손잡이 위치를 style 속성으로 그리기 때문인데,
   스타일은 코드를 실행하지 못하고 연결(connect/img/font-src)이 모두 막혀 있어 새어 나갈 길이 없다.
 - **독립 검토**: 1차(09-말) 지적 정션 탈출·느려짐(ReDoS)·백슬래시 링크 우회·장치 이름 누락, 2차(10-03, 편집기 교체 뒤) 지적 이동 미차단·바인딩 전 문서 주입·
@@ -76,11 +76,11 @@
 ## 빌드 (개발 서버에서만)
 ```
 (cd web/editor-app && npm ci)          # 처음 한 번: 편집기 엔진(버전 고정) 받기 - node는 opt/node22
-python3 build.py                       # 편집기 묶음(esbuild) → 금지 API 검사 → HTML·CSP → 아이콘(windres) → go test/vet → Windows exe → SHA256SUMS
+python3 build.py                       # 편집기 묶음(esbuild) → 금지 API 검사 → HTML·CSP → 아이콘(windres) → go test/vet → Windows exe → 설치 프로그램(makensis) → SHA256SUMS
 node --test tests/markdown.test.cjs    # 해석기 보안 시험
 ../.tools/pw/bin/python tests/e2e.py   # 화면 시험(Chromium, 프로그램 함수는 가짜로) - 탭·서식 편집·쪽 나누기·긴 표·두 쪽 보기·hwpx 내보내기
 node tests/hwpx.test.cjs build/sample.hwpx && ../news-briefing/.venv/bin/python tests/hwpx_check.py build/sample.hwpx   # hwpx 구조 검증(python-hwpx)
 ```
 한글 문서 골격(`assets/hwpx-template`)은 python-hwpx(Apache-2.0)의 빈 문서에서 땄다.
-도구: Go 1.27.1(go.dev 공식, SHA-256 대조), `binutils-mingw-w64`의 windres(Ubuntu), 아이콘은 `make_icon.py`(Pillow).
+도구: Go 1.27.1(go.dev 공식, SHA-256 대조), `binutils-mingw-w64`의 windres(Ubuntu), NSIS 3.09(Ubuntu `nsis`), 아이콘은 `make_icon.py`(Pillow).
 **아직 실제 Windows에서 돌려 보지 못했다** — 이 개발 서버에는 Windows가 없다. 첫 설치 때 창이 뜨는지, .md 더블클릭·저장이 되는지 확인이 필요하다.
