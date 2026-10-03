@@ -1,4 +1,4 @@
-"""아이콘 만들기: assets/icon-source.jpg(소유자가 준 그림) → 바깥 흰 배경을 투명하게 → nongmak.ico(16~256) + 화면용 PNG.
+"""아이콘 만들기: assets/icon-source.png(소유자가 준 그림, 10-03 두 번째 아이콘: 초록 바탕에 M↓와 새싹이) → 바깥 흰 배경을 투명하게 → nongmak.ico(16~256) + 화면용 PNG.
 빌드 때 한 번(Pillow 필요, 개발 서버에서만)."""
 import sys
 from collections import deque
@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).parent
-src = Image.open(ROOT / "assets/icon-source.jpg").convert("RGBA")
+src = Image.open(ROOT / "assets/icon-source.png").convert("RGBA")
 w, h = src.size
 px = src.load()
 # 가장자리에서 이어진 흰색(JPEG 얼룩 고려해 밝기 235 이상)만 투명하게 - 그림 안의 흰 종이·얼굴은 검은 테두리에 막혀 남는다
