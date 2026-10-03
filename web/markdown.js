@@ -88,9 +88,11 @@ function inline(src, depth = 0) {
     if (m[1] !== undefined) out += `<code>${esc(m[2])}</code>`;
     else if (m[4] !== undefined) {
       const img = safeImage(m[4]);
-      if (!img) out += `<span class="blocked" title="외부 그림은 불러오지 않습니다">[그림: ${esc(m[3] || m[4])}]</span>`;
-      else if (img.kind === "data") out += `<img alt="${esc(m[3])}" src="${esc(img.src)}">`;
-      else out += `<img alt="${esc(m[3])}" data-src="${esc(img.src)}">`;
+      const at = imageAttrs(m[3]);
+      const extra = (at.width ? ` width="${at.width}"` : "") + (at.align ? ` class="al-${at.align}"` : "");
+      if (!img) out += `<span class="blocked" title="외부 그림은 불러오지 않습니다">[그림: ${esc(at.alt || m[4])}]</span>`;
+      else if (img.kind === "data") out += `<img alt="${esc(at.alt)}" src="${esc(img.src)}"${extra}>`;
+      else out += `<img alt="${esc(at.alt)}" data-src="${esc(img.src)}"${extra}>`;
     } else if (m[6] !== undefined) {
       const url = safeUrl(m[6]);
       // 상대 링크는 href 없이 - 가운데 단추·새 탭으로 열려 원래 주소가 새어 나가지 않게. 화면이 data-href로 연다
@@ -129,7 +131,7 @@ function inlineRuns(src, style = {}, depth = 0) {
     push(src.slice(last, m.index));
     last = re.lastIndex;
     if (m[1] !== undefined) push(m[2], { code: true });
-    else if (m[4] !== undefined) out.push({ ...style, text: "", image: { alt: m[3], src: m[4] } });
+    else if (m[4] !== undefined) out.push({ ...style, text: "", image: { ...imageAttrs(m[3]), src: m[4] } });
     else if (m[6] !== undefined) {
       const url = safeUrl(m[6]);
       if (url) out.push(...inlineRuns(m[5], { ...style, link: url }, depth + 1));
@@ -156,7 +158,19 @@ const RE = {
   quote: /^\s*>/,
   table: /^\s*\|/,
   pagebreak: /^\s*<!--\s*pagebreak\s*-->\s*$/i, // 쪽 나눔(마크다운에는 쪽이 없어 주석으로 적는다 - 다른 뷰어에서는 안 보인다)
+  comment: /^\s*<!--[\s\S]*?-->\s*$/, // 주석만 있는 블록(표 열 너비 <!-- cols: … --> 등)은 보이지 않는다
 };
+
+/** 그림 설명 "설명|480|center" → {alt, width, align}. 너비(px)와 정렬은 마크다운에 없어 설명 뒤에 붙인다(Obsidian의 |너비 꼴). */
+function imageAttrs(alt) {
+  const parts = String(alt || "").split("|").map((s) => s.trim());
+  const out = { alt: parts[0], width: 0, align: "" };
+  for (const p of parts.slice(1)) {
+    if (/^\d{1,4}$/.test(p)) out.width = Number(p);
+    else if (/^(left|center|right)$/.test(p)) out.align = p;
+  }
+  return out;
+}
 
 /** 문서를 블록(편집 단위)으로 나눈다. 빈 줄이 블록을 가르고, 코드 블록·제목·구분선은 혼자 한 블록. */
 function headingText(t) {
@@ -264,6 +278,7 @@ function renderBlock(md, depth = 0) {
     return `<pre${lang ? ` data-lang="${esc(lang)}"` : ""}><code>${esc(code)}</code></pre>`;
   }
   if (RE.pagebreak.test(first) && lines.length === 1) return '<div class="pagebreak" data-pagebreak="1"><span>쪽 나눔</span></div>';
+  if (RE.comment.test(md)) return "";
   const h = first.match(RE.heading);
   if (h && lines.length === 1) return `<h${h[1].length}>${inline(headingText(h[2]))}</h${h[1].length}>`;
   if (RE.hr.test(first) && lines.length === 1) return "<hr>";
@@ -300,4 +315,4 @@ function titleOf(text) {
   return (m ? m[1] : String(text).split("\n").find((l) => l.trim()) || "").trim().slice(0, 80);
 }
 
-if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, inlineRuns, parseStyle, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf, headingText, RE };
+if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, inlineRuns, parseStyle, imageAttrs, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf, headingText, RE };

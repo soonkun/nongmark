@@ -34,9 +34,6 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 /* 편집 화면: 탭 줄 / 메뉴 줄 / (도구 막대 + 책상) / 상태 줄 */
 .app { display: grid; grid-template-rows: auto auto 1fr auto; height: 100%; }
 .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 6px 10px 0; background: var(--cream); border-bottom: 1px solid var(--line); min-height: 38px; }
-.tabs-brand { width: 22px; height: 22px; margin: 0 8px 7px 2px; }
-.tabs-gap { flex: 1; }
-.tabs-wordmark { height: 26px; width: auto; margin: 0 4px 5px; opacity: .9; }
 .tab { display: flex; align-items: center; gap: 6px; max-width: 240px; min-width: 0; padding: 6px 6px 7px 12px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 13px; color: var(--muted); cursor: default; user-select: none; }
 .tab:hover { background: var(--hover); }
 .tab.on { background: var(--paper); border-color: var(--line); color: var(--ink); font-weight: 600; }
@@ -60,6 +57,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .rb-wrap { position: relative; }
 .rb { display: flex; align-items: center; gap: 10px; width: 100%; flex: none; border: 1px solid transparent; border-radius: 7px; padding: 4px 6px; background: none; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; text-align: left; }
 .rb:hover { background: var(--hover); }
+.rb:disabled { opacity: .35; cursor: default; } .rb:disabled:hover { background: none; }
 .rb.on { background: var(--green-soft); border-color: var(--leaf); color: var(--green-d); }
 .rb .ic { width: 22px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; color: var(--ink); }
 .rb .lb { display: none; overflow: hidden; text-overflow: ellipsis; }
@@ -99,6 +97,8 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .pagebreak { margin: 10px 0; border-top: 1px dashed var(--wood-d); text-align: center; height: 0; }
 .pagebreak span { position: relative; top: -.8em; background: var(--paper); color: var(--muted); font-size: 8.5pt; padding: 0 8px; }
 .raw-wrap { width: 210mm; margin: 0 auto; }
+.editors { position: relative; }
+.print-doc { position: absolute; left: -10000px; top: 0; width: 210mm; } /* 인쇄용 쪽은 화면 밖에서 그려 두었다가 인쇄할 때만 보인다 */
 .zoom { display: inline-flex; align-items: center; }
 .zoom .icon-btn { padding: 0 6px; font-size: 12px; }
 
@@ -173,8 +173,8 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 @page { size: A4; margin: 0; }
 @media print {
   html, body, .desk { background: #fff !important; height: auto; }
-  .tabs, .menubar, .rail, .statusbar, .block-add, .pagebreak span { display: none !important; }
-  .block.editing { box-shadow: none; }
+  .tabs, .menubar, .rail, .statusbar, .block-add, .pagebreak span, .editors, .raw-wrap { display: none !important; }
+  .print-doc { position: static; width: auto; }
   .pagebreak { border: 0; }
   .app { display: block; } .body { display: block; } .desk { padding: 0; overflow: visible; }
   .pages { display: block; zoom: 1 !important; }

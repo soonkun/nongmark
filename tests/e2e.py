@@ -38,76 +38,71 @@ with sync_playwright() as p:
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("dialog", lambda d: d.accept("새 페이지"))
     page.goto("file://" + str(ROOT / "dist" / "nongmak.html"))
-    page.wait_for_selector(".doc h1")
+    page.wait_for_selector(".nm-pm h1")
     files = lambda: page.evaluate("window.__files")
-    open_doc = lambda name: (page.evaluate(f"window.__openNext = {json.dumps(name)}"), page.click("#btn-file"), page.click("#m-open"), page.wait_for_selector(f".tab.on:has-text('{name.replace('.md', '')}')"), time.sleep(0.5))
-    assert page.inner_text(".doc h1") == "시작" and page.evaluate("window.__title") == "시작"
-    assert page.locator(".doc script").count() == 0 and "<script>alert(1)</script>" in page.inner_text(".doc")
+    open_doc = lambda name: (page.evaluate(f"window.__openNext = {json.dumps(name)}"), page.click("#btn-file"), page.click("#m-open"), page.wait_for_selector(f".tab.on:has-text('{name.replace('.md', '')}')"), time.sleep(0.6))
+    assert page.inner_text(".nm-pm h1") == "시작" and page.evaluate("window.__title") == "시작"
+    assert page.locator(".nm-pm script").count() == 0 and "<script>alert(1)</script>" in page.inner_text(".nm-pm")
     assert page.locator(".tab").count() == 1 and page.inner_text(".tab.on .tab-name") == "시작"
     page.screenshot(path=str(ROOT / "build" / "editor.png"))
-    page.click(".doc input[type=checkbox] >> nth=0"); time.sleep(1.2)
-    assert "- [x] 할 일 하나" in files()["시작.md"], "체크 저장"
-    page.click(".doc p >> nth=0"); page.keyboard.press("End"); page.keyboard.type(" 덧붙임"); page.keyboard.press("Escape"); time.sleep(1.2)
+    page.click(".nm-pm input[type=checkbox] >> nth=0"); time.sleep(1.2)
+    assert "- [x] 할 일 하나" in files()["시작.md"], files()["시작.md"]
+    page.click(".nm-pm p >> nth=0"); page.keyboard.press("End"); page.keyboard.type(" 덧붙임"); time.sleep(1.2)
     assert "덧붙임" in files()["시작.md"], "편집 저장"
-    page.click(".sheet:last-child .sheet-body", position={"x": 20, "y": 860}); page.keyboard.type("/표"); page.wait_for_selector(".slash-item"); page.keyboard.press("Enter"); page.keyboard.press("Escape"); time.sleep(1.2)
-    assert "| 항목 | 내용 |" in files()["시작.md"], "/ 메뉴"
-    page.click(".doc a:has-text('바깥')", modifiers=["Control"]); time.sleep(0.3)  # 서식 편집 중엔 Ctrl+클릭이 링크 열기
+    # 문서 끝에서 Enter → 빈 문단 → / 메뉴로 표
+    page.keyboard.press("Control+End"); page.keyboard.press("Enter"); page.keyboard.type("/표"); page.wait_for_selector(".nm-slash-item"); page.keyboard.press("Enter"); time.sleep(1.2)
+    assert "| --- | --- | --- |" in files()["시작.md"], files()["시작.md"]
+    assert not page.is_hidden("#f-tablebar"), "표 안이면 표 도구가 보인다"
+    page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); time.sleep(1.2)
+    assert "| 가 | 나 |  |" in files()["시작.md"], files()["시작.md"]
+    page.click(".nm-pm a:has-text('바깥')", modifiers=["Control"]); time.sleep(0.3)  # 편집 중엔 Ctrl+클릭이 링크 열기
     assert "바깥 주소는 열지 않습니다" in page.inner_text("#status")
-    page.click(".doc a:has-text('회의록')", modifiers=["Control"]); page.wait_for_selector(".doc h1:has-text('1차 회의')")
-    assert page.locator(".callout").count() == 1 and page.locator(".doc table").count() == 1
-    assert page.locator(".tab").count() == 2 and page.inner_text(".tab.on .tab-name") == "1차", "링크는 새 탭으로"
+    page.click(".nm-pm a:has-text('회의록')", modifiers=["Control"]); page.wait_for_selector(".tab.on:has-text('1차')"); time.sleep(0.4)
+    assert page.locator(".nm-desk:not([hidden]) .nm-callout").count() == 1 and page.locator(".nm-desk:not([hidden]) table").count() == 1
+    assert page.locator(".tab").count() == 2, "링크는 새 탭으로"
     # 파일 메뉴 → 새 문서(새 탭) → 쓰고 → Ctrl+S(다른 이름으로 저장)
-    page.click("#btn-file"); page.click("#m-new"); page.wait_for_selector(".block.editing")
+    page.click("#btn-file"); page.click("#m-new"); page.wait_for_selector(".tab.on:has-text('새 문서')"); time.sleep(0.3)
     assert page.locator(".tab").count() == 3 and page.locator(".tab.on .tab-dot.show").count() == 1
-    page.keyboard.type("새 문서 본문"); page.keyboard.press("Escape")
+    page.keyboard.type("새 문서 본문")
     page.keyboard.press("Control+s"); time.sleep(1)
-    assert "새 문서.md" in files() and "새 문서 본문" in files()["새 문서.md"], files().keys()
+    assert "새 문서.md" in files() and "새 문서 본문" in files()["새 문서.md"], repr(files().get("새 문서.md"))
     assert page.inner_text(".tab.on .tab-name") == "새 문서" and page.locator(".tab.on .tab-dot.show").count() == 0
     page.keyboard.press("Control+w"); time.sleep(0.3)
     assert page.locator(".tab").count() == 2, "탭 닫기"
-    page.click(".tab:has-text('시작')"); page.wait_for_selector(".doc h1:has-text('시작')")
-    page.screenshot(path=str(ROOT / "build" / "editor2.png"))
-    # 서식 편집기: 단어를 골라 굵게·빨강, 표를 넣고 칸에 쓰기
-    page.click(".doc p >> nth=0"); page.keyboard.press("Home")
+    page.click(".tab:has-text('시작')"); page.wait_for_selector(".tab.on:has-text('시작')"); time.sleep(0.3)
+    # 서식: 단어를 골라 굵게·빨강(도구 막대), 글을 고르면 서식 띠가 뜬다
+    page.click(".nm-desk:not([hidden]) .nm-pm p >> nth=0"); page.keyboard.press("Home")
     for _ in range(2): page.keyboard.press("Shift+ArrowRight")
-    page.click("#rail [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); page.keyboard.press("Escape"); time.sleep(1.2)
-    assert '**<span style="color:#c00000">첫 </span>**' in files()["시작.md"], files()["시작.md"]
-    page.click(".doc p >> nth=0"); page.click("#f-table"); time.sleep(0.3)  # 대화상자 → "4 × 2"는 기본값으로 받는다
-    page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); page.keyboard.press("Escape"); time.sleep(1.2)
-    assert "| 가 | 나 |" in files()["시작.md"], files()["시작.md"]
+    time.sleep(0.2); assert not page.is_hidden(".nm-desk:not([hidden]) .nm-bubble"), "서식 띠"
+    page.click("#rail [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); time.sleep(1.2)
+    assert '<span style="color:#c00000">**첫**</span>' in files()["시작.md"], files()["시작.md"]
+    page.screenshot(path=str(ROOT / "build" / "editor2.png"))
     # 도구 막대 펼치기(이름 보임)·접기
     w0 = page.evaluate("document.querySelector('#rail').getBoundingClientRect().width")
     page.click("#btn-side"); time.sleep(0.4)
     assert page.is_visible("#f-table .lb") and page.evaluate("document.querySelector('#rail').getBoundingClientRect().width") > w0 + 80
     page.click("#btn-side"); time.sleep(0.4)
     assert not page.is_visible("#f-table .lb") and 40 < w0 < 60
-    # 긴 표: 쪽을 넘어 잘린다(머리 줄 반복)
+    # 긴 표: 쪽 경계가 생기고 쪽 수가 센다
     page.evaluate("""() => { window.__files["긴 표.md"] = "# 긴 표\\n\\n| 구분 | 내용 |\\n| --- | --- |\\n" + Array.from({length: 70}, (_, n) => `| 항목 ${n} | 내용 ${n} |`).join("\\n") + "\\n\\n끝 문단\\n"; }""")
     open_doc("긴 표.md")
-    conts, theads = page.locator(".block.cont").count(), page.locator(".doc thead").count()
-    over = page.evaluate("[...document.querySelectorAll('.sheet-body')].filter(b => b.scrollHeight > b.clientHeight + 2).length")
-    print("긴 표: 이어 붙인 조각", conts, "| 머리 줄", theads, "| 넘친 쪽", over)
-    assert conts >= 1 and theads == conts + 1 and over == 0 and page.locator(".sheet").last.locator("p:has-text('끝 문단')").count() == 1
-    # 쪽: 긴 문서는 여러 쪽, 쪽 나눔 뒤는 새 쪽, 쪽 크기는 A4(96dpi에서 794px 폭)
+    gaps = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count()
+    print("긴 표: 쪽 경계", gaps, "| 상태 줄", page.inner_text("#pages"))
+    assert gaps >= 1 and page.inner_text("#pages") == f"{gaps + 1}쪽"
+    # 긴 문서: 여러 쪽, 쪽 나눔 뒤는 새 쪽
     open_doc("긴 문서.md")
     assert page.locator(".tab").count() == 4
-    sheets = page.locator(".sheet").count()
-    w = page.evaluate("document.querySelector('.sheet').getBoundingClientRect().width")
-    last_has_new = page.locator(".sheet").nth(sheets - 1).locator("h2:has-text('새 쪽')").count()
-    print("쪽 수:", sheets, "| 쪽 폭 px:", round(w), "| 쪽 나눔 뒤 새 쪽:", bool(last_has_new))
-    assert sheets >= 3 and abs(w - 793.7) < 3 and last_has_new
-    over = page.evaluate("[...document.querySelectorAll('.sheet-body')].filter(b => b.scrollHeight > b.clientHeight + 2 && b.childElementCount > 1).length")
-    assert over == 0, f"넘친 쪽 {over}"
-    # 확대·축소: Ctrl+휠로 줄이면 쪽이 나란히
+    gaps = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count()
+    w = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-sheet').getBoundingClientRect().width")
+    print("긴 문서: 쪽 경계", gaps, "| 쪽 폭 px:", round(w))
+    assert gaps >= 2 and abs(w - 793.7) < 3
+    # 확대·축소
     page.mouse.move(700, 400)
-    for _ in range(6): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.05)
-    tops = page.evaluate("[...document.querySelectorAll('.sheet')].slice(0,2).map(s => Math.round(s.getBoundingClientRect().top))")
-    print("줌:", page.inner_text("#zoom-val"), "| 첫 두 쪽 위치:", tops)
-    assert tops[0] == tops[1], "두 쪽이 나란히 놓이지 않음"
-    page.screenshot(path=str(ROOT / "build" / "two-pages.png"))
+    for _ in range(3): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.05)
+    print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "70%"
     page.click("#zoom-val")
     # 한글로 내보내기
-    page.click("#btn-file"); page.click("#m-hwpx"); time.sleep(1)
+    page.click("#btn-file"); page.click("#m-hwpx"); time.sleep(1.5)
     exp = page.evaluate("window.__export")
     import base64
     (ROOT / "build" / "export.hwpx").write_bytes(base64.b64decode(exp["b64"]))

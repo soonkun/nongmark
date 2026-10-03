@@ -61,11 +61,27 @@ def data_uri(name: str) -> str:
     return "data:image/png;base64," + base64.b64encode((ASSETS / name).read_bytes()).decode()
 
 
+NODE = Path(os.environ.get("NODE", ROOT.parent / "opt/node22/bin/node"))
+EDITOR_APP = WEB / "editor-app"  # ProseMirror/Tiptap 편집기 묶음(esbuild) - 버전은 package-lock.json에 고정
+BUNDLE = ROOT / "build" / "editor-bundle.js"
+
+
+def build_editor() -> str:
+    """편집기 묶음을 만든다(node_modules가 있어야 한다: cd web/editor-app && npm ci). 묶음 안에 코드 실행 API가 있으면 멈춘다."""
+    subprocess.run([str(NODE), str(EDITOR_APP / "build.mjs")], check=True)
+    js = BUNDLE.read_text(encoding="utf-8")
+    bad = [m.group(0) for m in re.finditer(r"\beval\s*\(|\bnew\s+Function\b|\bXMLHttpRequest\b|\bWebSocket\b|\bimportScripts\b|document\.write\b", js)]
+    if bad:
+        sys.exit("편집기 묶음에 금지 API가 있어 빌드를 멈춥니다: " + ", ".join(sorted(set(bad))))
+    return js
+
+
 def build_html() -> Path:
     markdown = (WEB / "markdown.js").read_text(encoding="utf-8")
     app = (WEB / "app.js").read_text(encoding="utf-8")
     hwpx = (WEB / "hwpx.js").read_text(encoding="utf-8")
-    editor = (WEB / "editor.js").read_text(encoding="utf-8")
+    editor_js = build_editor()
+    editor_css = "\n" + (WEB / "editor.css").read_text(encoding="utf-8")
     T = ASSETS / "hwpx-template"
     template = {k: (T / f).read_text(encoding="utf-8") for k, f in [("header", "header.xml"), ("section", "section0.xml"), ("version", "version.xml"),
                 ("settings", "settings.xml"), ("container", "container.xml"), ("containerRdf", "container.rdf"), ("manifest", "manifest.xml")]}
@@ -73,22 +89,24 @@ def build_html() -> Path:
     script = "\nconst MD = (() => {\n" + markdown.replace("if (typeof module", "// node 시험용 내보내기\n  if (false && typeof module") + \
         "\nreturn { splitBlocks, renderBlock, toggleTask, titleOf, inlineRuns, parseStyle, safeImage, headingText, RE };\n})();\n" + \
         "const MDX = MD;\nconst MD_SAFE_IMAGE = MD.safeImage;\nconst HWPX_TEMPLATE = " + json.dumps(template, ensure_ascii=False).replace("</", "<\\/") + ";\n" + \
-        hwpx.replace("if (typeof module", "if (false && typeof module") + "\n" + \
-        editor.replace("if (typeof module", "if (false && typeof module") + "\n" + app + "\n"
+        hwpx.replace("if (typeof module", "if (false && typeof module") + "\n" + app + "\n"
     check(script)
     style = "\n" + (WEB / "style.css").read_text(encoding="utf-8")
+    # style-src 'unsafe-inline': 편집기(ProseMirror)가 글자색·표 너비·손잡이 위치를 style 속성으로 그린다. 스타일은 코드를 실행하지 못하고
+    # 바깥 연결(connect/img/font-src)이 모두 막혀 있어 새어 나갈 길이 없다. 스크립트는 여전히 해시가 맞는 두 덩이만 돈다.
     csp = "; ".join([
         "default-src 'none'",
-        f"script-src '{sha(script)}'",
-        f"style-src '{sha(style)}'",
+        f"script-src '{sha(editor_js)}' '{sha(script)}'",
+        "style-src 'unsafe-inline'",
         "img-src blob: data:",
         "connect-src 'none'",
         "font-src 'none'", "media-src 'none'", "object-src 'none'", "frame-src 'none'", "worker-src 'none'",
         "manifest-src 'none'", "base-uri 'none'", "form-action 'none'",
     ])
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    html = html.replace("{{CSP}}", csp).replace("{{STYLE}}", style).replace("{{SCRIPT}}", script)
-    html = html.replace("{{ICON64}}", data_uri("icon-64.png")).replace("{{ICON192}}", data_uri("icon-192.png")).replace("{{WORDMARK}}", data_uri("wordmark.png"))
+    html = html.replace("{{CSP}}", csp).replace("{{STYLE}}", style).replace("{{EDITOR_STYLE}}", editor_css)
+    html = html.replace("{{EDITOR_SCRIPT}}", editor_js).replace("{{SCRIPT}}", script)
+    html = html.replace("{{ICON64}}", data_uri("icon-64.png"))
     assert "{{" not in html
     DIST.mkdir(exist_ok=True)
     out = DIST / "nongmak.html"

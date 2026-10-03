@@ -1,0 +1,25 @@
+{
+  "name": "nongmak-editor",
+  "private": true,
+  "version": "0.0.0",
+  "description": "새싹이의 농막 편집기 묶음(ProseMirror/Tiptap, React 없음) - esbuild로 한 파일로 묶어 nongmak.html에 넣는다",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-drag-handle": "3.31.4",
+    "@tiptap/extension-highlight": "3.31.4",
+    "@tiptap/extension-image": "3.31.4",
+    "@tiptap/extension-link": "3.31.4",
+    "@tiptap/extension-placeholder": "3.31.4",
+    "@tiptap/extension-table": "3.31.4",
+    "@tiptap/extension-text-style": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@tiptap/suggestion": "3.31.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.27.7"
+  }
+}

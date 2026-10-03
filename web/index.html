@@ -8,14 +8,12 @@
 <title>새싹이의 농막</title>
 <link rel="icon" type="image/png" href="{{ICON64}}">
 <style>{{STYLE}}</style>
+<style>{{EDITOR_STYLE}}</style>
 </head>
 <body>
 <div id="app" class="app">
   <div id="tabs" class="tabs">
-    <img class="tabs-brand" src="{{ICON64}}" alt="" title="새싹이의 농막">
     <button id="tab-add" class="tab-add" title="새 문서 (Ctrl+N)">＋</button>
-    <span class="tabs-gap"></span>
-    <img class="tabs-wordmark" src="{{WORDMARK}}" alt="새싹이의 농막">
   </div>
   <div class="menubar">
     <button id="btn-side" class="icon-btn hamburger" title="도구 이름 보이기·숨기기" aria-label="도구 막대 펼치기"><span></span><span></span><span></span></button>
@@ -42,53 +40,73 @@
   </div>
   <div class="body">
     <aside id="rail" class="rail" aria-label="서식 도구">
+      <button class="rb" id="f-undo" title="되돌리기 (Ctrl+Z)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5H2V2"/><path d="M2.5 5A6 6 0 1 1 3 11"/></svg></span><span class="lb">되돌리기</span></button>
+      <button class="rb" id="f-redo" title="다시 하기 (Ctrl+Y)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h3V2"/><path d="M13.5 5A6 6 0 1 0 13 11"/></svg></span><span class="lb">다시 하기</span></button>
+      <hr>
       <div class="rb-wrap"><button class="rb" id="f-block" title="블록 종류"><span class="ic"><span class="ic-font">¶</span></span><span class="lb">블록 종류</span></button><div id="pop-block" class="pop" hidden></div></div>
       <hr>
       <button class="rb" data-cmd="bold" title="굵게 (Ctrl+B)"><span class="ic"><b>가</b></span><span class="lb">굵게</span></button>
       <button class="rb" data-cmd="italic" title="기울임 (Ctrl+I)"><span class="ic"><i>가</i></span><span class="lb">기울임</span></button>
       <button class="rb" data-cmd="underline" title="밑줄 (Ctrl+U)"><span class="ic"><u>가</u></span><span class="lb">밑줄</span></button>
-      <button class="rb" data-cmd="strikeThrough" title="취소선"><span class="ic"><s>가</s></span><span class="lb">취소선</span></button>
+      <button class="rb" data-cmd="strike" title="취소선 (Ctrl+Shift+S)"><span class="ic"><s>가</s></span><span class="lb">취소선</span></button>
       <hr>
       <div class="rb-wrap"><button class="rb" id="f-font" title="글꼴"><span class="ic"><span class="ic-font">Aa</span></span><span class="lb">글꼴</span></button><div id="pop-font" class="pop" hidden></div></div>
       <div class="rb-wrap"><button class="rb" id="f-size" title="글자 크기"><span class="ic"><span class="ic-size">A<small>A</small></span></span><span class="lb">글자 크기</span></button><div id="pop-size" class="pop" hidden></div></div>
       <div class="rb-wrap"><button class="rb" id="f-color" title="글자색"><span class="ic"><span class="ic-col"><span class="a">가</span><span id="f-color-sw" class="swatch"></span></span></span><span class="lb">글자색</span></button><div id="pal-color" class="pop pal" hidden></div></div>
       <div class="rb-wrap"><button class="rb" id="f-bg" title="형광펜"><span class="ic"><span class="ic-col"><span class="a hl">가</span><span id="f-bg-sw" class="swatch"></span></span></span><span class="lb">형광펜</span></button><div id="pal-bg" class="pop pal" hidden></div></div>
       <hr>
-      <button class="rb" data-cmd="insertUnorderedList" title="글머리 목록"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="3" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/><path d="M6 4h7M6 8h7M6 12h7"/></svg></span><span class="lb">글머리 목록</span></button>
-      <button class="rb" data-cmd="insertOrderedList" title="번호 목록"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h7M6 8h7M6 12h7"/><text x="1" y="5.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">1</text><text x="1" y="9.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">2</text><text x="1" y="13.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">3</text></svg></span><span class="lb">번호 목록</span></button>
-      <button class="rb" id="f-task" title="할 일 상자"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8l2 2 4-4"/></svg></span><span class="lb">할 일</span></button>
+      <button class="rb" data-cmd="bullet" title="글머리 목록"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="3" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/><path d="M6 4h7M6 8h7M6 12h7"/></svg></span><span class="lb">글머리 목록</span></button>
+      <button class="rb" data-cmd="ordered" title="번호 목록"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h7M6 8h7M6 12h7"/><text x="1" y="5.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">1</text><text x="1" y="9.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">2</text><text x="1" y="13.5" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">3</text></svg></span><span class="lb">번호 목록</span></button>
+      <button class="rb" data-cmd="task" title="할 일 상자"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8l2 2 4-4"/></svg></span><span class="lb">할 일</span></button>
+      <div class="rb-wrap"><button class="rb" id="f-callout" title="눈에 띄는 상자(참고·팁·중요·주의·경고)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M5 3v10"/></svg></span><span class="lb">콜아웃</span></button><div id="pop-callout" class="pop" hidden></div></div>
       <hr>
       <button class="rb" id="f-table" title="표 넣기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 7h12M6 3v10M10 3v10"/></svg></span><span class="lb">표 넣기</span></button>
       <div id="f-tablebar" class="rail-group" hidden>
-        <button class="rb" id="f-row-add" title="아래에 줄 더하기"><span class="ic">줄+</span><span class="lb">줄 더하기</span></button>
-        <button class="rb" id="f-col-add" title="오른쪽에 칸 더하기"><span class="ic">칸+</span><span class="lb">칸 더하기</span></button>
-        <button class="rb" id="f-row-del" title="이 줄 지우기"><span class="ic">줄−</span><span class="lb">줄 지우기</span></button>
-        <button class="rb" id="f-col-del" title="이 칸의 열 지우기"><span class="ic">칸−</span><span class="lb">칸 지우기</span></button>
+        <button class="rb" id="f-rowAdd" title="아래에 줄 더하기"><span class="ic">줄+</span><span class="lb">줄 더하기</span></button>
+        <button class="rb" id="f-colAdd" title="오른쪽에 칸 더하기"><span class="ic">칸+</span><span class="lb">칸 더하기</span></button>
+        <button class="rb" id="f-rowDel" title="이 줄 지우기"><span class="ic">줄−</span><span class="lb">줄 지우기</span></button>
+        <button class="rb" id="f-colDel" title="이 칸의 열 지우기"><span class="ic">칸−</span><span class="lb">칸 지우기</span></button>
+        <button class="rb" id="f-headerRow" title="첫 줄을 머리 줄로 / 해제"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 7h12M6 7v6M10 7v6"/><path d="M2 3h12v4H2z" fill="currentColor" fill-opacity=".25" stroke="none"/></svg></span><span class="lb">머리 줄</span></button>
+        <button class="rb" id="f-cell-left" title="칸 글 왼쪽 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 8h8M2 12h12"/></svg></span><span class="lb">왼쪽 정렬</span></button>
+        <button class="rb" id="f-cell-center" title="칸 글 가운데 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M4 8h8M2 12h12"/></svg></span><span class="lb">가운데 정렬</span></button>
+        <button class="rb" id="f-cell-right" title="칸 글 오른쪽 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M6 8h8M2 12h12"/></svg></span><span class="lb">오른쪽 정렬</span></button>
+        <button class="rb" id="f-tableDel" title="표 지우기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10"/></svg></span><span class="lb">표 지우기</span></button>
       </div>
-      <button class="rb" id="f-image" title="그림 넣기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="6" cy="7" r="1.2"/><path d="M2 12l4-3 3 2 2-2 3 3"/></svg></span><span class="lb">그림</span></button>
-      <button class="rb" id="f-link" title="링크 걸기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9a3 3 0 0 0 4 0l2-2a3 3 0 0 0-4-4L8 4"/><path d="M9 7a3 3 0 0 0-4 0L3 9a3 3 0 0 0 4 4l1-1"/></svg></span><span class="lb">링크</span></button>
+      <button class="rb" id="f-image" title="그림 넣기(붙여넣기·끌어다 놓기도 됩니다)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="6" cy="7" r="1.2"/><path d="M2 12l4-3 3 2 2-2 3 3"/></svg></span><span class="lb">그림</span></button>
+      <div id="f-imagebar" class="rail-group" hidden>
+        <button class="rb" id="f-img-left" title="그림 왼쪽 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 8h8M2 12h12"/></svg></span><span class="lb">왼쪽</span></button>
+        <button class="rb" id="f-img-center" title="그림 가운데 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M4 8h8M2 12h12"/></svg></span><span class="lb">가운데</span></button>
+        <button class="rb" id="f-img-right" title="그림 오른쪽 정렬"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M6 8h8M2 12h12"/></svg></span><span class="lb">오른쪽</span></button>
+        <button class="rb" id="f-img-width" title="그림 너비(px) - 모서리를 끌어도 됩니다"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h12M4 5l-2 3 2 3M12 5l2 3-2 3"/></svg></span><span class="lb">너비</span></button>
+        <button class="rb" id="f-img-alt" title="그림 설명(대체 글)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="8" rx="1"/><path d="M4 13h8"/></svg></span><span class="lb">설명</span></button>
+        <button class="rb" id="f-img-del" title="그림 지우기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10"/></svg></span><span class="lb">그림 지우기</span></button>
+      </div>
+      <button class="rb" id="f-link" title="링크 걸기(열기는 Ctrl+클릭)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9a3 3 0 0 0 4 0l2-2a3 3 0 0 0-4-4L8 4"/><path d="M9 7a3 3 0 0 0-4 0L3 9a3 3 0 0 0 4 4l1-1"/></svg></span><span class="lb">링크</span></button>
+      <button class="rb" id="f-hr" title="구분선"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h12"/></svg></span><span class="lb">구분선</span></button>
       <button class="rb" id="f-break" title="여기서 다음 쪽으로"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v4h10V2M3 14v-4h10v4"/><path d="M2 8h2M6 8h4M12 8h2" stroke-dasharray="2 1"/></svg></span><span class="lb">쪽 나누기</span></button>
       <hr>
+      <button class="rb" id="f-up" title="블록을 위로 (Alt+↑)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg></span><span class="lb">위로</span></button>
+      <button class="rb" id="f-down" title="블록을 아래로 (Alt+↓)"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></span><span class="lb">아래로</span></button>
+      <hr>
       <button class="rb" id="f-clear" title="선택한 글의 꾸밈을 모두 지우기"><span class="ic"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l5 5-6 6H5l-3-3z"/><path d="M4 14h10"/></svg></span><span class="lb">서식 지우기</span></button>
-      <input id="f-image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
     </aside>
     <div class="desk">
-      <div id="page">
-        <div id="doc" class="doc pages"></div>
-        <div id="raw-wrap" class="raw-wrap" hidden><textarea id="raw" class="raw" spellcheck="false"></textarea></div>
-      </div>
+      <div id="editors" class="editors"></div>
+      <div id="raw-wrap" class="raw-wrap" hidden><textarea id="raw" class="raw" spellcheck="false"></textarea></div>
+      <div id="print-doc" class="doc pages print-doc" hidden></div>
     </div>
   </div>
   <footer class="statusbar">
     <span id="status" class="status">준비</span>
     <span class="sb-gap"></span>
-    <span class="sb-hint">/ 블록 넣기 · Shift+Enter 줄바꿈 · Esc 편집 끝 · Ctrl+휠 확대</span>
+    <span class="sb-hint">/ 블록 넣기 · 글을 고르면 서식 띠 · 왼쪽 손잡이로 블록 끌기 · Ctrl+휠 확대</span>
     <span id="pages" class="count"></span>
     <span id="count" class="count"></span>
     <span class="zoom"><button id="zoom-out" class="icon-btn" title="축소">－</button><button id="zoom-val" class="icon-btn" title="100%로">100%</button><button id="zoom-in" class="icon-btn" title="확대">＋</button></span>
   </footer>
 </div>
 <div id="slash" class="slash" hidden></div>
+<script>{{EDITOR_SCRIPT}}</script>
 <script>{{SCRIPT}}</script>
 </body>
 </html>
