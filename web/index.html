@@ -21,6 +21,19 @@
       <button id="win-close" title="닫기"><svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.1"/></svg></button>
     </div>
   </div>
+  <!-- 대문: 열 문서 없이 시작했거나 탭을 다 닫았을 때. 탭 줄(제목 줄)은 그대로 위에 있다 -->
+  <div id="welcome" class="welcome" hidden>
+    <div class="welcome-card">
+      <img class="wordmark" src="{{WORDMARK}}" alt="새싹이의 농막">
+      <p class="lead">농촌진흥청 마크다운 편집기</p>
+      <div class="welcome-actions">
+        <button id="w-new" class="tile"><span class="tile-t">새 문서</span><span class="tile-s">빈 문서로 시작</span><kbd>Ctrl+N</kbd></button>
+        <button id="w-file" class="tile"><span class="tile-t">문서 열기</span><span class="tile-s">.md 파일 고르기</span><kbd>Ctrl+O</kbd></button>
+      </div>
+      <div id="w-recent" class="recent" hidden><div class="recent-title">최근 문서</div><div id="w-recent-list"></div></div>
+      <p id="w-note" class="note">마크다운(.md) 파일을 더블클릭해도 농막으로 열립니다. 고친 내용은 바로 저장됩니다.<br>이 프로그램은 인터넷에 연결하지 않습니다.</p>
+    </div>
+  </div>
   <div class="menubar">
     <button id="btn-side" class="icon-btn hamburger" title="도구 이름 보이기·숨기기" aria-label="도구 막대 펼치기"><span></span><span></span><span></span></button>
     <div class="menu-wrap">

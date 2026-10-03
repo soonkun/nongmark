@@ -133,6 +133,7 @@ async function addTab(doc, markdown) {
   });
   await t.ed.ready;
   state.tabs.push(t);
+  showHome(false);
   await activate(state.tabs.length - 1);
   return t;
 }
@@ -167,7 +168,8 @@ async function closeTab(j) {
   state.tabs.splice(j, 1);
   if (!state.tabs.length) {
     state.tab = -1;
-    return newDocument();
+    renderTabs();
+    return showHome(true); // 다 닫으면 대문으로
   }
   const next = j < state.tab ? state.tab - 1 : Math.min(state.tab, state.tabs.length - 1);
   state.tab = -1;
@@ -200,8 +202,55 @@ async function openPath(store, path) {
   try {
     const text = await store.read(path);
     await addTab({ store, path }, text);
+    rememberRecent(store, path);
   } catch (e) {
     status("열지 못했습니다: " + (e.message || e), "error");
+  }
+}
+
+/* ---------------- 대문과 최근 문서 ---------------- */
+
+function showHome(on) {
+  $("#app").classList.toggle("home", on);
+  $("#welcome").hidden = !on;
+  if (on) {
+    document.title = "새싹이의 농막";
+    if (NATIVE) window.nm_setTitle("");
+    renderRecent();
+  }
+}
+
+function recentList() {
+  try { return JSON.parse(localStorage.getItem("nongmak.recent") || "[]"); } catch { return []; }
+}
+
+function rememberRecent(store, path) {
+  if (store.kind !== "native" || !path) return;
+  const full = store.dir + "\\" + path.replace(/\//g, "\\");
+  const list = [{ full, name: path.split("/").pop().replace(MD_EXT, "") }, ...recentList().filter((r) => r.full !== full)].slice(0, 8);
+  try { localStorage.setItem("nongmak.recent", JSON.stringify(list)); } catch { /* 기억 못 해도 된다 */ }
+}
+
+function renderRecent() {
+  const list = recentList();
+  $("#w-recent").hidden = !NATIVE || !list.length;
+  const box = $("#w-recent-list");
+  box.textContent = "";
+  for (const r of list) {
+    const b = el("button");
+    b.append(el("span", "r-name", r.name), el("span", "r-path", r.full));
+    b.title = r.full;
+    b.onclick = async () => {
+      try {
+        const info = await window.nm_openRecent(r.full);
+        if (info && info.root) await openPath(nativeStore(info), info.open);
+      } catch (e) {
+        status("열지 못했습니다(옮겨졌거나 지워진 문서): " + e, "error");
+        try { localStorage.setItem("nongmak.recent", JSON.stringify(list.filter((x) => x.full !== r.full))); } catch { /* 무시 */ }
+        renderRecent();
+      }
+    };
+    box.append(b);
   }
 }
 
@@ -625,6 +674,7 @@ async function saveAs() {
       t.dirty = false;
       renderTabs();
       setDocTitle();
+      rememberRecent(t.store, t.path);
       status("저장됨", "ok");
       return true;
     } catch (e) {
@@ -751,6 +801,8 @@ async function start() {
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
   $("#tab-add").onclick = newDocument;
+  $("#w-new").onclick = newDocument;
+  $("#w-file").onclick = openDialog;
   setupTitlebar();
   setupRail();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
@@ -811,7 +863,7 @@ async function start() {
       return;
     }
   }
-  await newDocument(); // 메모장처럼 빈 새 문서로 시작한다
+  showHome(true); // 열 문서가 없으면 대문
 }
 
 start();

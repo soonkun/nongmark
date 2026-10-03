@@ -138,6 +138,14 @@ func main() {
 		}
 		return register(ws)
 	})
+	// 대문의 "최근 문서": 화면이 기억해 둔 전체 경로를 다시 연다. 더블클릭으로 연 것과 같은 길(.md만, 그 폴더를 등록).
+	must("nm_openRecent", func(full string) (info, error) {
+		ws := &workspace{}
+		if err := ws.openTarget(full); err != nil {
+			return info{}, err
+		}
+		return register(ws)
+	})
 	// 다른 이름으로 저장: 어디든 고른 곳에 쓰고, 그 폴더를 등록한다.
 	must("nm_saveAs", func(suggest, text string) (info, error) {
 		p := saveFileDialog(hwnd(w), suggest)

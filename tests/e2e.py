@@ -25,6 +25,7 @@ window.nm_image = () => Promise.reject("없음");
 window.nm_setTitle = (t) => { window.__title = t; return ok(null); };
 window.nm_openFile = () => ok({...root, open: window.__openNext || "시작.md"});
 window.nm_saveAs = (name, text) => { F[name] = text; return ok({...root, open: name}); };
+window.nm_openRecent = (full) => ok({...root, open: full.split("\\\\").pop()});
 window.nm_alert = () => ok(null);
 window.nm_saveBytes = (name, ext, b64) => { window.__export = {name, ext, b64}; return ok("C:/시험/" + name); };
 """ % json.dumps(FILES, ensure_ascii=False)
@@ -77,6 +78,7 @@ with sync_playwright() as p:
     assert page.inner_text(".tab.on .tab-name") == "새 문서" and page.locator(".tab.on .tab-dot.show").count() == 0
     page.keyboard.press("Control+w"); time.sleep(0.3)
     assert page.locator(".tab").count() == 2, "탭 닫기"
+    assert any(r["name"] == "새 문서" for r in json.loads(page.evaluate("localStorage.getItem('nongmak.recent')"))), "최근 문서 기억"
     page.click(".tab:has-text('시작')"); page.wait_for_selector(".tab.on:has-text('시작')"); time.sleep(0.3)
     # 서식: 단어를 골라 굵게·빨강(도구 막대), 글을 고르면 서식 띠가 뜬다
     page.click(".nm-desk:not([hidden]) .nm-pm p >> nth=0"); page.keyboard.press("Home")
@@ -126,8 +128,11 @@ with sync_playwright() as p:  # 가짜 없이 = 브라우저에서 html만 연 �
     b = p.chromium.launch(); page = b.new_page(viewport={"width": 1280, "height": 820})
     page.on("request", lambda r: None if r.url.startswith(("file:", "data:", "blob:")) else outside.append(r.url))
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-    page.goto("file://" + str(ROOT / "dist" / "nongmak.html")); page.wait_for_selector(".tab.on:has-text('새 문서')")
-    page.screenshot(path=str(ROOT / "build" / "welcome.png")); b.close()
+    page.goto("file://" + str(ROOT / "dist" / "nongmak.html")); page.wait_for_selector("#welcome:not([hidden])")
+    page.screenshot(path=str(ROOT / "build" / "welcome.png"))
+    page.click("#w-new"); page.wait_for_selector(".tab.on:has-text('새 문서')"); assert page.is_hidden("#welcome")
+    page.keyboard.press("Control+w"); page.wait_for_selector("#welcome:not([hidden])")  # 다 닫으면 대문
+    b.close()
 
 print("바깥 연결:", outside or "없음")
 print("콘솔 오류:", errors or "없음")

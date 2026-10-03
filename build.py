@@ -106,7 +106,7 @@ def build_html() -> Path:
     html = (WEB / "index.html").read_text(encoding="utf-8")
     html = html.replace("{{CSP}}", csp).replace("{{STYLE}}", style).replace("{{EDITOR_STYLE}}", editor_css)
     html = html.replace("{{EDITOR_SCRIPT}}", editor_js).replace("{{SCRIPT}}", script)
-    html = html.replace("{{ICON64}}", data_uri("icon-64.png"))
+    html = html.replace("{{ICON64}}", data_uri("icon-64.png")).replace("{{WORDMARK}}", data_uri("wordmark.png"))
     assert "{{" not in html
     DIST.mkdir(exist_ok=True)
     out = DIST / "nongmak.html"
