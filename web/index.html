@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+<meta name="referrer" content="no-referrer">
+<title>새싹이의 농막</title>
+<link rel="icon" type="image/png" href="{{ICON64}}">
+<style>{{STYLE}}</style>
+</head>
+<body>
+<div id="welcome" class="welcome" hidden>
+  <div class="welcome-card">
+    <img class="wordmark" src="{{WORDMARK}}" alt="새싹이의 농막">
+    <p class="lead">농촌진흥청 마크다운 편집기</p>
+    <div class="welcome-actions">
+      <button id="w-new" class="tile"><span class="tile-t">새 문서</span><span class="tile-s">빈 문서로 시작</span><kbd>Ctrl+N</kbd></button>
+      <button id="w-file" class="tile"><span class="tile-t">파일 열기</span><span class="tile-s">.md 문서 하나</span><kbd>Ctrl+O</kbd></button>
+      <button id="w-folder" class="tile"><span class="tile-t">폴더 열기</span><span class="tile-s">문서 묶음 전체</span></button>
+    </div>
+    <button id="w-last" class="link-btn" hidden></button>
+    <p id="w-note" class="note">폴더를 열면 그 안의 문서가 왼쪽 목록에 나오고, 고친 내용은 바로 저장됩니다.<br>이 프로그램은 인터넷에 연결하지 않습니다.</p>
+  </div>
+</div>
+
+<div id="app" class="app" hidden>
+  <aside class="side">
+    <div class="brand"><img src="{{ICON64}}" alt=""><span>새싹이의 농막</span></div>
+    <div class="side-head">
+      <span id="rootname" class="rootname"></span>
+      <button id="btn-folder" class="icon-btn" title="다른 폴더 열기">폴더 바꾸기</button>
+    </div>
+    <input id="search" class="search" type="search" placeholder="제목·본문 찾기" autocomplete="off">
+    <div class="side-actions">
+      <button id="btn-new" class="btn small">＋ 새 페이지</button>
+      <button id="btn-newdir" class="btn small ghost">＋ 폴더</button>
+    </div>
+    <nav id="tree" class="tree"></nav>
+  </aside>
+  <main class="main">
+    <div class="toolbar">
+      <div class="menu-wrap">
+        <button id="btn-file" class="menu-btn">파일 ▾</button>
+        <div id="filemenu" class="menu" hidden>
+          <button id="m-new">새 문서<kbd>Ctrl+N</kbd></button>
+          <button id="m-open">열기…<kbd>Ctrl+O</kbd></button>
+          <button id="m-folder">폴더 열기…</button>
+          <hr>
+          <button id="m-save">저장<kbd>Ctrl+S</kbd></button>
+          <button id="m-saveas">다른 이름으로 저장…<kbd>Ctrl+Shift+S</kbd></button>
+          <hr>
+          <button id="m-print">인쇄 · PDF로 저장…<kbd>Ctrl+P</kbd></button>
+        </div>
+      </div>
+      <div class="title"><span id="crumb" class="crumb"></span><span id="pagename" class="pagename"></span></div>
+      <button id="btn-raw" class="icon-btn" title="문서 전체를 마크다운 원문으로 보기·고치기">원문</button>
+      <button id="btn-rename" class="icon-btn" title="이름 바꾸기">이름 바꾸기</button>
+      <button id="btn-delete" class="icon-btn" title="이 문서 지우기">지우기</button>
+      <button id="btn-theme" class="icon-btn" title="밝게 / 어둡게">어둡게</button>
+    </div>
+    <div class="desk">
+      <div id="empty-state" class="empty-page">
+        <img src="{{ICON192}}" alt="">
+        <p>왼쪽에서 문서를 고르거나 <b>＋ 새 페이지</b>를 만드세요.</p>
+      </div>
+      <article id="page" class="page" hidden>
+        <div id="doc" class="doc"></div>
+        <textarea id="raw" class="raw" spellcheck="false" hidden></textarea>
+        <div id="doc-end" class="doc-end" title="눌러서 끝에 이어 쓰기"></div>
+      </article>
+    </div>
+    <footer class="statusbar">
+      <span id="status" class="status">준비</span>
+      <span class="sb-gap"></span>
+      <span id="count" class="count"></span>
+      <span class="sb-hint">/ 블록 넣기 · Esc 편집 끝</span>
+    </footer>
+  </main>
+</div>
+<div id="slash" class="slash" hidden></div>
+<script>{{SCRIPT}}</script>
+</body>
+</html>
