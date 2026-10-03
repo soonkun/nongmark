@@ -14,6 +14,12 @@
 <div id="app" class="app">
   <div id="tabs" class="tabs">
     <button id="tab-add" class="tab-add" title="새 문서 (Ctrl+N)">＋</button>
+    <div id="tabs-drag" class="tabs-drag" title="끌어서 창 옮기기 · 두 번 눌러 최대화"></div>
+    <div id="wincmd" class="wincmd" hidden>
+      <button id="win-min" title="최소화"><svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 5h10" stroke="currentColor" stroke-width="1"/></svg></button>
+      <button id="win-max" title="최대화"><svg viewBox="0 0 10 10" width="10" height="10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+      <button id="win-close" title="닫기"><svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" stroke-width="1.1"/></svg></button>
+    </div>
   </div>
   <div class="menubar">
     <button id="btn-side" class="icon-btn hamburger" title="도구 이름 보이기·숨기기" aria-label="도구 막대 펼치기"><span></span><span></span><span></span></button>

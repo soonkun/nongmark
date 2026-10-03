@@ -50,6 +50,7 @@ type webview struct {
 	mainthread uintptr
 	browser    browser
 	autofocus  bool
+	frameless  bool // 농막: 시스템 제목 줄 없이(WM_NCCALCSIZE로 위쪽 캡션만 떼어 낸다 - 테두리·그림자·끌어 붙이기는 그대로)
 	maxsz      w32.Point
 	minsz      w32.Point
 	m          sync.Mutex
@@ -240,6 +241,23 @@ func wndproc(hwnd, msg, wp, lp uintptr) uintptr {
 			_, _, _ = w32.User32DestroyWindow.Call(hwnd)
 		case w32.WMDestroy:
 			w.Terminate()
+		case w32.WMNCCalcSize:
+			if !w.frameless || wp == 0 {
+				r, _, _ := w32.User32DefWindowProcW.Call(hwnd, msg, wp, lp)
+				return r
+			}
+			// 기본 처리로 양옆·아래 테두리는 남기고, 위쪽은 창 꼭대기까지 클라이언트로 만든다(= 제목 줄 제거).
+			// 최대화 상태에서는 창이 테두리만큼 화면 밖으로 밀려 있어 그만큼 아래로 내린다.
+			p := (*w32.NCCalcSizeParams)(unsafe.Pointer(lp))
+			top := p.Rgrc[0].Top
+			_, _, _ = w32.User32DefWindowProcW.Call(hwnd, msg, wp, lp)
+			p.Rgrc[0].Top = top
+			if z, _, _ := w32.User32IsZoomed.Call(hwnd); z != 0 {
+				f, _, _ := w32.User32GetSystemMetrics.Call(w32.SMCYFrame)
+				pb, _, _ := w32.User32GetSystemMetrics.Call(w32.SMCXPaddedBdr)
+				p.Rgrc[0].Top += int32(f + pb)
+			}
+			return 0
 		case w32.WMGetMinMaxInfo:
 			lpmmi := (*w32.MinMaxInfo)(unsafe.Pointer(lp))
 			if w.maxsz.X > 0 && w.maxsz.Y > 0 {
@@ -379,6 +397,43 @@ func (w *webview) Run() {
 
 func (w *webview) Terminate() {
 	_, _, _ = w32.User32PostQuitMessage.Call(0)
+}
+
+// SetFrameless: 시스템 제목 줄을 떼어 낸다(화면이 탭 줄을 제목 줄로 쓴다). 창 스타일은 그대로라 크기 조절·그림자·화면 끝에 붙이기가 된다.
+func (w *webview) SetFrameless(on bool) {
+	w.frameless = on
+	_, _, _ = w32.User32SetWindowPos.Call(w.hwnd, 0, 0, 0, 0, 0, w32.SWPNoMove|w32.SWPNoSize|w32.SWPNoZOrder|w32.SWPFrameChanged)
+}
+
+// WindowCommand: 화면의 제목 줄(탭 줄)이 부탁하는 창 조작. "drag" 끌기 시작, "resize-top" 위쪽 크기 조절, "min"/"max"/"close".
+// 돌려주는 값은 최대화 여부(화면이 단추 모양을 맞춘다).
+func (w *webview) WindowCommand(cmd string) bool {
+	switch cmd {
+	case "drag", "resize-top", "resize-top-left", "resize-top-right":
+		ht := uintptr(w32.HTCaption)
+		switch cmd {
+		case "resize-top":
+			ht = w32.HTTop
+		case "resize-top-left":
+			ht = w32.HTTopLeft
+		case "resize-top-right":
+			ht = w32.HTTopRight
+		}
+		_, _, _ = w32.User32ReleaseCapture.Call()
+		_, _, _ = w32.User32SendMessageW.Call(w.hwnd, w32.WMNCLButtonDown, ht, 0)
+	case "min":
+		_, _, _ = w32.User32ShowWindow.Call(w.hwnd, w32.SWMinimize)
+	case "max":
+		if z, _, _ := w32.User32IsZoomed.Call(w.hwnd); z != 0 {
+			_, _, _ = w32.User32ShowWindow.Call(w.hwnd, w32.SWRestore)
+		} else {
+			_, _, _ = w32.User32ShowWindow.Call(w.hwnd, w32.SWMaximize)
+		}
+	case "close":
+		_, _, _ = w32.User32PostMessageW.Call(w.hwnd, w32.WMClose, 0, 0)
+	}
+	z, _, _ := w32.User32IsZoomed.Call(w.hwnd)
+	return z != 0
 }
 
 func (w *webview) Window() unsafe.Pointer {

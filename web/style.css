@@ -33,7 +33,14 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 
 /* 편집 화면: 탭 줄 / 메뉴 줄 / (도구 막대 + 책상) / 상태 줄 */
 .app { display: grid; grid-template-rows: auto auto 1fr auto; height: 100%; }
-.tabs { display: flex; align-items: flex-end; gap: 2px; padding: 6px 10px 0; background: var(--cream); border-bottom: 1px solid var(--line); min-height: 38px; }
+/* 탭 줄이 곧 창의 제목 줄이다(프로그램 창에는 시스템 제목 줄이 없다): 빈 곳을 끌면 창이 움직이고, 오른쪽 끝에 최소화·최대화·닫기 */
+.tabs { display: flex; align-items: flex-end; gap: 2px; padding: 6px 0 0 8px; background: var(--cream); border-bottom: 1px solid var(--line); min-height: 40px; position: relative; }
+.tabs-drag { flex: 1; align-self: stretch; min-width: 40px; }
+.wincmd { display: flex; align-self: flex-start; margin-top: -6px; }
+.wincmd button { width: 46px; height: 32px; border: 0; background: none; color: var(--ink); cursor: default; display: inline-flex; align-items: center; justify-content: center; }
+.wincmd button:hover { background: var(--hover); } #win-close:hover { background: #c42b1c; color: #fff; }
+.resize-top { position: fixed; left: 0; right: 0; top: 0; height: 5px; z-index: 50; cursor: ns-resize; }
+.app.maximized .resize-top { display: none; }
 .tab { display: flex; align-items: center; gap: 6px; max-width: 240px; min-width: 0; padding: 6px 6px 7px 12px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 13px; color: var(--muted); cursor: default; user-select: none; }
 .tab:hover { background: var(--hover); }
 .tab.on { background: var(--paper); border-color: var(--line); color: var(--ink); font-weight: 600; }

@@ -671,6 +671,42 @@ function toggleMenu(force) {
   $("#btn-file").classList.toggle("on", open);
 }
 
+/* ---------------- 창 제목 줄(탭 줄) - 프로그램 창에는 시스템 제목 줄이 없다 ---------------- */
+
+function setupTitlebar() {
+  if (!window.NONGMAK_FRAMELESS || !window.nm_win) return;
+  $("#wincmd").hidden = false;
+  const win = (cmd) => window.nm_win(cmd).then(syncMax).catch(() => {});
+  const syncMax = (zoomed) => {
+    $("#app").classList.toggle("maximized", !!zoomed);
+    $("#win-max").title = zoomed ? "이전 크기로" : "최대화";
+    $("#win-max").firstElementChild.innerHTML = zoomed
+      ? '<rect x="2.5" y=".5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><rect x=".5" y="2.5" width="7" height="7" fill="var(--cream)" stroke="currentColor" stroke-width="1"/>'
+      : '<rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/>';
+  };
+  // 끌기는 창의 끌기 루프가 마우스를 가져가 dblclick 이벤트가 오지 않는다 - 두 번째 누름을 직접 알아본다
+  let last = { t: 0, x: 0, y: 0 };
+  const drag = (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    const now = Date.now();
+    const twice = now - last.t < 450 && Math.abs(ev.clientX - last.x) < 6 && Math.abs(ev.clientY - last.y) < 6;
+    last = { t: twice ? 0 : now, x: ev.clientX, y: ev.clientY };
+    win(twice ? "max" : "drag");
+  };
+  $("#tabs-drag").addEventListener("mousedown", drag);
+  $("#tabs").addEventListener("mousedown", (ev) => { if (ev.target === $("#tabs")) drag(ev); });
+  $("#win-min").onclick = () => win("min");
+  $("#win-max").onclick = () => win("max");
+  $("#win-close").onclick = () => win("close");
+  // 위쪽 가장자리 5px: 창 높이 조절(제목 줄이 없어진 자리의 크기 조절 테두리 노릇)
+  const edge = el("div", "resize-top");
+  document.body.append(edge);
+  edge.addEventListener("mousedown", (ev) => { if (ev.button !== 0) return; ev.preventDefault(); const w = window.innerWidth; win(ev.clientX < 8 ? "resize-top-left" : ev.clientX > w - 8 ? "resize-top-right" : "resize-top"); });
+  window.addEventListener("resize", () => win("state"));
+  win("state");
+}
+
 /* ---------------- 보기 ---------------- */
 
 function setZoom(z) {
@@ -715,6 +751,7 @@ async function start() {
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
   $("#tab-add").onclick = newDocument;
+  setupTitlebar();
   setupRail();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   $("#raw").oninput = () => {

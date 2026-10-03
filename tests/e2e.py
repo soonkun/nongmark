@@ -12,7 +12,8 @@ FILES = {
     "회의/1차.md": "# 1차 회의\n\n> [!NOTE]\n> 참고 상자\n\n| 항목 | 내용 |\n| --- | --- |\n| 예산 | 3억 |\n",
 }
 FAKE = """
-window.NONGMAK_NATIVE = true;
+window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;
+window.nm_win = (c) => { window.__win = (window.__win || []).concat(c); return Promise.resolve(c === "max" ? !(window.__zoomed = !window.__zoomed) === false : !!window.__zoomed); };
 const F = %s; window.__files = F; const DIR = "C:\\\\시험"; const root = {root: "시험", dir: DIR, open: "시작.md"};
 const ok = (v) => Promise.resolve(v);
 const chk = (dir) => { if (dir !== DIR) throw new Error("열지 않은 폴더: " + dir); };
@@ -84,6 +85,11 @@ with sync_playwright() as p:
     page.click("#rail [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); time.sleep(1.2)
     assert '<span style="color:#c00000">**첫**</span>' in files()["시작.md"], files()["시작.md"]
     page.screenshot(path=str(ROOT / "build" / "editor2.png"))
+    # 창 제목 줄 = 탭 줄: 빈 곳을 끌면 창 끌기, 두 번 누르면 최대화, 오른쪽 단추
+    assert not page.is_hidden("#wincmd")
+    page.mouse.move(700, 20); page.mouse.down(); page.mouse.up(); time.sleep(0.6); page.mouse.down(); page.mouse.up(); page.mouse.down(); page.mouse.up(); page.click("#win-min"); time.sleep(0.2)
+    cmds = page.evaluate("window.__win"); print("창 명령:", cmds)
+    assert "drag" in cmds and "max" in cmds and "min" in cmds
     # 도구 막대 펼치기(이름 보임)·접기
     w0 = page.evaluate("document.querySelector('#rail').getBoundingClientRect().width")
     page.click("#btn-side"); time.sleep(0.4)

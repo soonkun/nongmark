@@ -46,6 +46,10 @@ var (
 	User32SetWindowPos       = user32.NewProc("SetWindowPos")
 	User32IsDialogMessage    = user32.NewProc("IsDialogMessage")
 	User32GetAncestor        = user32.NewProc("GetAncestor")
+	// 농막: 제목 줄 없는 창(탭 줄이 제목 줄 노릇) - 창 끌기·최소/최대화·닫기를 화면이 부탁한다
+	User32ReleaseCapture = user32.NewProc("ReleaseCapture")
+	User32SendMessageW   = user32.NewProc("SendMessageW")
+	User32IsZoomed       = user32.NewProc("IsZoomed")
 )
 
 const (
@@ -93,10 +97,29 @@ const (
 	WMClose         = 0x0010
 	WMQuit          = 0x0012
 	WMGetMinMaxInfo = 0x0024
+	WMNCCalcSize    = 0x0083
 	WMNCLButtonDown = 0x00A1
 	WMMoving        = 0x0216
 	WMApp           = 0x8000
 )
+
+const (
+	// 비클라이언트 히트 코드(WM_NCLBUTTONDOWN에 실어 보내면 끌기·크기 조절이 시작된다)
+	HTCaption     = 2
+	HTTop         = 12
+	HTTopLeft     = 13
+	HTTopRight    = 14
+	SWMinimize    = 6
+	SWMaximize    = 3
+	SWRestore     = 9
+	SMCYFrame     = 33
+	SMCXPaddedBdr = 92
+	SWPNoSize     = 0x0001
+)
+
+type NCCalcSizeParams struct {
+	Rgrc [3]Rect
+}
 
 const (
 	GAParent    = 1

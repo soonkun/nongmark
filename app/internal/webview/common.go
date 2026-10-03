@@ -48,6 +48,12 @@ type WebView interface {
 	// NSWindow pointer, when using Win32 backend the pointer is HWND pointer.
 	Window() unsafe.Pointer
 
+	// SetFrameless removes the system title bar (the page draws its own). Nongmak addition.
+	SetFrameless(on bool)
+
+	// WindowCommand asks the window to start a drag/resize, minimize, maximize/restore or close. Returns whether maximized. Nongmak addition.
+	WindowCommand(cmd string) bool
+
 	// SetTitle updates the title of the native window. Must be called from the UI
 	// thread.
 	SetTitle(title string)

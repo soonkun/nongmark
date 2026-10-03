@@ -119,6 +119,14 @@ func main() {
 		return ws.Image(rel)
 	})
 	must("nm_setTitle", func(t string) { w.SetTitle(cut(t, 120) + " - 새싹이의 농막") })
+	// 창 조작(제목 줄 없는 창이라 화면의 탭 줄이 끌기·최소/최대화·닫기를 맡는다). 허용된 명령 외에는 아무 일도 하지 않는다.
+	must("nm_win", func(cmd string) bool {
+		switch cmd {
+		case "drag", "resize-top", "resize-top-left", "resize-top-right", "min", "max", "close", "state":
+			return w.WindowCommand(cmd)
+		}
+		return false
+	})
 	must("nm_openFile", func() (info, error) {
 		p := openFileDialog(hwnd(w))
 		if p == "" {
@@ -172,7 +180,8 @@ func main() {
 		}
 		return p, os.WriteFile(p, data, 0o644)
 	})
-	w.Init("window.NONGMAK_NATIVE = true;")
+	w.Init("window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;")
+	w.SetFrameless(true)
 	w.SetHtml(page)
 	w.Run()
 }
