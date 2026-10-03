@@ -147,7 +147,7 @@ async function activate(j) {
   const t = cur();
   t.host.hidden = false;
   if (state.raw) $("#raw").value = t.ed.getMarkdown();
-  if (state.zoom < 1) setZoom(state.zoom);
+  setZoom(state.zoom);
   renderTabs();
   setDocTitle();
   countChars();
@@ -705,11 +705,11 @@ function fitsTwo() {
 }
 
 function setZoom(z) {
-  state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 10) / 10;
+  state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 100) / 100; // 1% 단위(휠은 10%씩, 폭 맞춤은 딱 맞는 값)
   $("#editors").style.zoom = state.zoom;
   $("#raw-wrap").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
-  const two = state.zoom < 1 && fitsTwo() && state.pages;
+  const two = fitsTwo() && state.pages; // 배율과 무관하게 폭에 두 장이 들어가면 격자(넓은 화면은 100%에서도)
   for (const t of state.tabs) t.ed.setGrid(two, 2);
   state.two = two;
 }
@@ -730,7 +730,7 @@ function toggleSide(open) {
   app.classList.toggle("rail-open", show);
   $("#btn-side").classList.toggle("on", show);
   try { localStorage.setItem("nongmak.rail", show ? "1" : "0"); } catch { /* 무시 */ }
-  if (state.zoom < 1) setTimeout(() => setZoom(state.zoom), 220); // 도구 막대 폭이 바뀌면(펼침 .2s 뒤) 두 쪽이 들어가는지 다시 본다
+  setTimeout(() => setZoom(state.zoom), 220); // 도구 막대 폭이 바뀌면(펼침 .2s 뒤) 두 쪽이 들어가는지 다시 본다
 }
 
 function setTheme(theme) {
@@ -790,10 +790,30 @@ async function start() {
     setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
   let resizeTimer = null;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.zoom < 1) setZoom(state.zoom); }, 150); }); // 창 폭이 바뀌면 두 쪽이 들어가는지 다시 본다
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => setZoom(state.zoom), 150); }); // 창 폭이 바뀌면 두 쪽이 들어가는지 다시 본다
   $("#zoom-in").onclick = () => setZoom(state.zoom + 0.1);
   $("#zoom-out").onclick = () => setZoom(state.zoom - 0.1);
-  $("#zoom-val").onclick = () => setZoom(1);
+  // 배율 숫자를 누르면 고르기: 폭 맞춤(한 쪽/두 쪽)과 자주 쓰는 값
+  $("#zoom-val").onclick = (ev) => {
+    ev.stopPropagation();
+    const avail = $(".desk").clientWidth - 40;
+    const fit1 = Math.floor(avail / SHEET_PX * 100) / 100, fit2 = Math.floor(avail / (2 * SHEET_PX + 24) * 100) / 100;
+    const items = [[fit1, `한 쪽 폭 맞춤 (${Math.round(fit1 * 100)}%)`], [fit2, `두 쪽 폭 맞춤 (${Math.round(fit2 * 100)}%)`], [0.5, "50%"], [0.75, "75%"], [1, "100%"], [1.25, "125%"], [1.5, "150%"]];
+    const pop = $("#pop-zoom");
+    if (!pop.hidden) { pop.hidden = true; return; }
+    pop.textContent = "";
+    for (const [z, label] of items) {
+      const b = el("button", "pi" + (Math.abs(z - state.zoom) < 0.005 ? " on" : ""), label);
+      b.type = "button";
+      b.onclick = () => { pop.hidden = true; setZoom(z); };
+      pop.append(b);
+    }
+    pop.hidden = false;
+    const r = $("#zoom-val").getBoundingClientRect();
+    pop.style.left = Math.min(r.left, window.innerWidth - pop.offsetWidth - 8) + "px";
+    pop.style.top = r.top - pop.offsetHeight - 6 + "px";
+  };
+  document.addEventListener("click", () => { $("#pop-zoom").hidden = true; });
   $("#btn-side").onclick = () => toggleSide();
   try { if (localStorage.getItem("nongmak.rail") === "1") toggleSide(true); } catch { /* 무시 */ }
   document.addEventListener("keydown", (ev) => {

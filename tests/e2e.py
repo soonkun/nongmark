@@ -150,7 +150,13 @@ with sync_playwright() as p:
     assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0, "도구 막대 폭을 고려"
     page.click("#btn-side"); time.sleep(0.6)
     assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4
-    page.click("#zoom-val"); time.sleep(0.3)
+    # 배율 메뉴: 두 쪽 폭 맞춤 → 격자, 100% → 한 쪽
+    page.click("#zoom-val"); page.wait_for_selector("#pop-zoom:not([hidden])"); page.click("#pop-zoom button:has-text('두 쪽 폭 맞춤')"); time.sleep(0.5)
+    print("두 쪽 폭 맞춤 배율:", page.inner_text("#zoom-val")); assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4
+    w2 = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-grid').getBoundingClientRect().width"); desk = page.evaluate("document.querySelector('.desk').clientWidth")
+    print("격자 폭/책상 폭:", round(w2), desk); assert desk - 60 <= w2 <= desk, "폭에 딱 맞게"
+    page.click("#zoom-val"); page.click("#pop-zoom button:has-text('100%')"); time.sleep(0.4)
+    assert page.inner_text("#zoom-val") == "100%" and page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0
     # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
     page.click("#btn-pages"); time.sleep(0.5)
     print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmak.pages')"))
