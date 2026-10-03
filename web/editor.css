@@ -15,11 +15,12 @@
 .nm-pm li { margin: 2px 0; } .nm-pm li > p { margin: 0; }
 .nm-pm li::marker { color: var(--leaf); }
 .nm-pm ul[data-type="taskList"] { list-style: none; padding-left: .3em; }
-.nm-pm ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 7px; }
-.nm-pm ul[data-type="taskList"] li > label { flex: none; margin-top: .35em; }
-.nm-pm ul[data-type="taskList"] li > label input { accent-color: var(--green); cursor: pointer; margin: 0; }
-.nm-pm ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
-.nm-pm ul[data-type="taskList"] li[data-checked="true"] > div { color: var(--muted); text-decoration: line-through; }
+.nm-pm ul[data-type="taskList"] > li { display: flex; align-items: flex-start; gap: 7px; }
+.nm-pm ul[data-type="taskList"] > li > label { flex: none; margin-top: .35em; }
+.nm-pm ul[data-type="taskList"] > li > label input { accent-color: var(--green); cursor: pointer; margin: 0; }
+.nm-pm ul[data-type="taskList"] > li > div { flex: 1; min-width: 0; }
+.nm-pm ul[data-type="taskList"] > li[data-checked="true"] > div > p:first-child { color: var(--muted); text-decoration: line-through; }
+.nm-pm ul[data-type="taskList"] ul:not([data-type="taskList"]) { list-style: disc; padding-left: 1.6em; } /* 할 일 아래 일반 목록은 점 표시 */
 .nm-pm a { color: var(--green); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--green) 40%, transparent); text-underline-offset: 3px; cursor: text; }
 .nm-pm code { background: var(--code); border-radius: 4px; padding: .1em .35em; font: .88em "D2Coding", "Consolas", monospace; color: var(--code-ink); }
 .nm-pm pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow: auto; margin: 8px 0; }
