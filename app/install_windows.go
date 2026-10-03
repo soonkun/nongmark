@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -146,10 +147,14 @@ func install() error {
 		}
 	}
 	shChangeNotify.Call(shcneAssoc, 0, 0, 0)
+	shortcutProblems = installShortcuts(target) // 바탕화면·시작 메뉴 바로 가기(실패해도 설치는 된 것)
 	return nil
 }
 
+var shortcutProblems []string
+
 func uninstall() error {
+	removeShortcuts()
 	// 옛 이름(Nongmak.Markdown, nongmak.exe)으로 등록된 것도 함께 지운다 - 이름을 nongmark로 바꾸기 전 설치분
 	for _, id := range []string{progID, "Nongmak.Markdown"} {
 		for _, ext := range []string{".md", ".markdown"} {
@@ -210,7 +215,11 @@ func handleFlags(args []string) bool {
 			showError("농막: " + err.Error())
 			os.Exit(1)
 		}
-		showInfo("농막을 설치했습니다.\n\n설치 위치: " + installDir() + "\n\n.md 파일을 더블클릭하면 농막으로 열립니다.\n다른 프로그램으로 열리면: 파일 오른쪽 단추 → 연결 프로그램 → 다른 앱 선택 → 농막 → '항상 이 앱 사용'.")
+		note := "바탕화면과 시작 메뉴에 '새싹이의 농막' 바로 가기를 만들었습니다."
+		if len(shortcutProblems) > 0 {
+			note = "바로 가기를 만들지 못했습니다(" + strings.Join(shortcutProblems, "; ") + ") - 설치 폴더의 nongmark.exe를 직접 실행하세요."
+		}
+		showInfo("농막을 설치했습니다.\n\n설치 위치: " + installDir() + "\n" + note + "\n\n.md 파일을 더블클릭하면 농막으로 열립니다.\n다른 프로그램으로 열리면: 파일 오른쪽 단추 → 연결 프로그램 → 다른 앱 선택 → 농막 → '항상 이 앱 사용'.")
 		return true
 	case "--uninstall":
 		_ = uninstall()
