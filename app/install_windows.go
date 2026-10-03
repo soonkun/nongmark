@@ -124,7 +124,7 @@ func install() error {
 	steps := [][3]string{
 		{`Software\Classes\` + progID, "", "마크다운 문서"},
 		{`Software\Classes\` + progID, "FriendlyTypeName", "마크다운 문서"},
-		{`Software\Classes\` + progID + `\DefaultIcon`, "", target + ",0"},
+		{`Software\Classes\` + progID + `\DefaultIcon`, "", target + ",-2"}, // 음수 = 리소스 ID 2(문서 아이콘). 0은 프로그램 아이콘
 		{`Software\Classes\` + progID + `\shell`, "", "open"},
 		{`Software\Classes\` + progID + `\shell\open`, "", "농막으로 열기"},
 		{`Software\Classes\` + progID + `\shell\open\command`, "", cmd},
