@@ -130,7 +130,6 @@ func NewWithOptions(options WebViewOptions) WebView {
 	_ = settings.PutIsStatusBarEnabled(false)
 	_ = settings.PutIsBuiltInErrorPageEnabled(false)
 	_ = settings.PutIsZoomControlEnabled(false)
-	_ = settings.PutAreBrowserAcceleratorKeysEnabled(false) // F5·Ctrl+R·Alt+←(다시 읽기·뒤로) 같은 브라우저 단축키 끔 - 저장 안 한 문서가 날아가지 않게
 
 	return w
 }

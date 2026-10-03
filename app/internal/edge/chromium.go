@@ -3,6 +3,7 @@
 package edge
 
 import (
+	"strings"
 	"log"
 	"os"
 	"path/filepath"
@@ -244,10 +245,15 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 	return 0
 }
 
-// NavigationStarting: about:blank(우리가 SetHtml로 넣는 화면)만 허용. 문서 안 링크 클릭·드롭한 파일·주소 입력 등 다른 이동은 모두 취소.
+// isOurPage: 우리가 SetHtml(NavigateToString)로 넣는 화면인가. 런타임 판에 따라 about:blank 또는 data: 주소로 보고된다.
+func isOurPage(uri string) bool {
+	return uri == "" || uri == "about:blank" || strings.HasPrefix(uri, "about:") || strings.HasPrefix(uri, "data:")
+}
+
+// NavigationStarting: 우리 화면 말고 다른 곳(http·https·file·ftp…)으로 가는 이동은 취소한다 - 문서 안 링크 클릭·드롭한 파일 등.
 func (e *Chromium) NavigationStarting(sender *ICoreWebView2, args *ICoreWebView2NavigationStartingEventArgs) uintptr {
 	uri, _ := args.GetUri()
-	if uri != "about:blank" {
+	if !isOurPage(uri) {
 		_ = args.PutCancel(true)
 	}
 	return 0
@@ -266,7 +272,7 @@ func (e *Chromium) MessageReceived(sender *ICoreWebView2, args *iCoreWebView2Web
 	if source != nil {
 		src := w32.Utf16PtrToString(source)
 		windows.CoTaskMemFree(unsafe.Pointer(source))
-		if src != "about:blank" {
+		if !isOurPage(src) {
 			return 0
 		}
 	}

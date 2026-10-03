@@ -859,6 +859,10 @@ async function start() {
   }, true);
   for (const type of ["dragover", "drop"]) document.addEventListener(type, (ev) => { if (!ev.target.closest?.(".nm-pm")) ev.preventDefault(); });
   document.addEventListener("drop", (ev) => { if (!ev.defaultPrevented) ev.preventDefault(); });
+  // 브라우저 단축키(F5·Ctrl+R 다시 읽기, Alt+←/→ 뒤로·앞으로)는 문서를 날린다 - 막는다
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "F5" || ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "r") || (ev.altKey && (ev.key === "ArrowLeft" || ev.key === "ArrowRight"))) ev.preventDefault();
+  }, true);
   $("#tab-add").onclick = newDocument;
   $("#w-new").onclick = newDocument;
   $("#w-file").onclick = openDialog;
