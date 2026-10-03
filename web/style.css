@@ -133,6 +133,9 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .pagebreak { margin: 10px 0; border-top: 1px dashed var(--wood-d); text-align: center; height: 0; }
 .pagebreak span { position: relative; top: -.8em; background: var(--paper); color: var(--muted); font-size: 8.5pt; padding: 0 8px; }
 .raw-wrap { width: 210mm; margin: 0 auto; }
+.raw { display: block; width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; background: var(--paper); color: var(--ink); resize: vertical; box-sizing: border-box;
+  font: 14px/1.7 "D2Coding", "Consolas", "Malgun Gothic", monospace; outline: none; }
+.raw:focus { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--green-soft); }
 .editors { position: relative; }
 .print-doc { position: absolute; left: -10000px; top: 0; width: 170mm; } /* 인쇄용 복제본은 화면 밖에 두었다가 인쇄할 때만 보인다 */
 .print-doc .nm-pagebreak { display: none; }

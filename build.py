@@ -157,10 +157,31 @@ def build_exe() -> list[Path]:
     return [exe, DIST / "WebView2Loader.dll"]
 
 
+def sign(path: Path) -> None:
+    """코드 서명(있을 때만). 환경 변수 NONGMARK_SIGN_PFX(.pfx 경로)·NONGMARK_SIGN_PASS(비밀번호)가 있으면 osslsigncode로 서명한다.
+    서명이 있어야 UAC·SmartScreen 창에 '게시자: 농촌진흥청'이 뜬다. 인증서가 없으면 '확인되지 않은 게시자'로 남는다(건너뜀).
+    타임스탬프 서버는 쓰지 않는다(이 빌드 서버가 바깥에 연결하지 않게) - 필요하면 NONGMARK_SIGN_TS=주소."""
+    pfx = os.environ.get("NONGMARK_SIGN_PFX")
+    if not pfx:
+        return
+    tmp = path.with_suffix(path.suffix + ".signed")
+    cmd = ["osslsigncode", "sign", "-pkcs12", pfx, "-n", "새싹이의 농막", "-h", "sha256", "-in", str(path), "-out", str(tmp)]
+    if os.environ.get("NONGMARK_SIGN_PASS"):
+        cmd += ["-pass", os.environ["NONGMARK_SIGN_PASS"]]
+    if os.environ.get("NONGMARK_SIGN_TS"):
+        cmd += ["-ts", os.environ["NONGMARK_SIGN_TS"]]
+    subprocess.run(cmd, check=True)
+    tmp.replace(path)
+    print("서명함:", path.name)
+
+
 def build_setup() -> Path:
     """NSIS(makensis, Ubuntu nsis 패키지)로 설치 프로그램을 만든다: 범위 선택·바로 가기·.md 연결·앱 및 기능 항목·제거 프로그램."""
+    sign(DIST / "nongmark.exe")  # 설치 프로그램에 들어가기 전에 본 프로그램부터
     subprocess.run(["makensis", "-V2", "nongmark.nsi"], cwd=ROOT / "installer", check=True)
-    return DIST / "nongmark-setup.exe"
+    out = DIST / "nongmark-setup.exe"
+    sign(out)
+    return out
 
 
 def main() -> None:

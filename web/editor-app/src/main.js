@@ -214,9 +214,95 @@ function create(container, opts = {}) {
   };
   const listeners = { change: [], pages: [], state: [] };
   const emit = (name, ...a) => listeners[name].forEach((fn) => fn(...a));
-  let twoMode = false, pageCount = 1;
-  const PAGE_W = Math.round(210 * 96 / 25.4), GAP_W = 24; // 쪽 한 장의 폭(px)과 쪽 사이 간격
-  const fitWidth = () => { sheet.style.width = twoMode ? pageCount * (PAGE_W + GAP_W) - GAP_W + "px" : ""; };
+  let pageCount = 1;
+
+  /* 격자(쪽 나란히) 보기. 문서 흐름(.nm-sheet)은 하나이고 쪽마다 창(.nm-slot)을 둔다. 커서가 있는 쪽의 창에는 진짜 편집기를(쪽 위치만큼 위로 밀어서),
+     나머지 창에는 복제본을 보여 준다. 쪽 경계 위젯 덕에 흐름에서 쪽 k는 정확히 k×(297mm+24px) 위치에서 시작한다. 1·2쪽, 그 아래 3·4쪽… 편집은 그대로. */
+  const MMPX = 96 / 25.4, PERIOD = 297 * MMPX + 24; // 쪽 한 장 + 책상 틈
+  const grid = { on: false, cols: 2, live: 0, slots: [], box: null, timer: 0 };
+  const zoomOf = () => (sheet.offsetWidth ? sheet.getBoundingClientRect().width / sheet.offsetWidth : 1) || 1; // 조상의 CSS zoom까지 합친 실제 배율
+  const cleanClone = () => {
+    const c = sheet.cloneNode(true);
+    c.classList.add("nm-sheet-clone");
+    c.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
+    c.querySelectorAll(".nm-handle, .nm-tablebox, [data-resize-handle], .column-resize-handle, .ProseMirror-selectednode, .selectedCell").forEach((e) => e.classList.contains("ProseMirror-selectednode") || e.classList.contains("selectedCell") ? e.classList.remove("ProseMirror-selectednode", "selectedCell") : e.remove());
+    c.style.paddingBottom = sheet.style.paddingBottom;
+    return c;
+  };
+  const shift = (elm, k) => { elm.style.transform = `translateY(${-k * PERIOD}px)`; };
+  function refreshClones() {
+    if (!grid.on) return;
+    const base = cleanClone();
+    grid.slots.forEach((slot, k) => {
+      if (k === grid.live) return;
+      const c = base.cloneNode(true);
+      shift(c, k);
+      slot.replaceChildren(c);
+    });
+  }
+  function layoutGrid() {
+    if (!grid.on) return;
+    grid.box.style.setProperty("--cols", grid.cols);
+    while (grid.slots.length < pageCount) {
+      const slot = el("div", "nm-slot");
+      const k = grid.slots.length;
+      slot.addEventListener("pointerdown", (ev) => {
+        if (k === grid.live) return;
+        ev.preventDefault();
+        moveLive(k);
+        const pos = editor.view.posAtCoords({ left: ev.clientX, top: ev.clientY });
+        if (pos) editor.commands.setTextSelection(pos.pos); // focus()를 먼저 부르면 옛 선택으로 돌아가 다른 쪽으로 튄다
+        editor.view.focus();
+      });
+      grid.slots.push(slot);
+      grid.box.append(slot);
+    }
+    while (grid.slots.length > pageCount) grid.slots.pop().remove();
+    if (grid.live >= pageCount) moveLive(pageCount - 1);
+    if (!grid.slots[grid.live].contains(sheet)) { grid.slots[grid.live].replaceChildren(sheet); shift(sheet, grid.live); }
+    grid.slots.forEach((s, k) => s.classList.toggle("live", k === grid.live));
+    refreshClones();
+  }
+  function moveLive(k) {
+    if (!grid.on || k === grid.live || k < 0 || k >= grid.slots.length) return;
+    const old = grid.slots[grid.live];
+    grid.live = k;
+    grid.slots[k].replaceChildren(sheet);
+    shift(sheet, k);
+    const c = cleanClone(); shift(c, grid.slots.indexOf(old)); old.replaceChildren(c);
+    grid.slots.forEach((s, i) => s.classList.toggle("live", i === k));
+    grid.slots[k].scrollIntoView({ block: "nearest" });
+  }
+  /** 커서가 다른 쪽으로 넘어가면 편집기도 그 쪽의 창으로. 쪽은 커서가 든 블록의 흐름 안 위치(offsetTop 합 - 배율·transform과 무관)로 센다 */
+  function followCaret() {
+    if (!grid.on) return;
+    const { from } = editor.state.selection;
+    let node;
+    try { node = editor.view.domAtPos(from).node; } catch { return; }
+    let e = node.nodeType === 1 ? node : node.parentElement;
+    let y = 0;
+    for (; e && e !== sheet; e = e.offsetParent) y += e.offsetTop;
+    if (!e) return;
+    const page = Math.min(grid.slots.length - 1, Math.max(0, Math.floor(y / PERIOD)));
+    if (page !== grid.live) moveLive(page);
+  }
+  function setGrid(on, cols = 2) {
+    on = !!on;
+    if (on && grid.on && cols === grid.cols) return layoutGrid();
+    if (!on) {
+      if (!grid.on) return;
+      grid.on = false;
+      sheet.style.transform = "";
+      container.insertBefore(sheet, container.firstChild);
+      grid.box.remove(); grid.box = null; grid.slots = [];
+      container.classList.remove("grid");
+      return;
+    }
+    grid.on = true; grid.cols = cols;
+    if (!grid.box) { grid.box = el("div", "nm-grid"); container.insertBefore(grid.box, container.firstChild); }
+    container.classList.add("grid");
+    layoutGrid();
+  }
 
   const editor = new Editor({
     element: sheet,
@@ -247,11 +333,11 @@ function create(container, opts = {}) {
         render: () => { const h = el("div", "nm-handle"); h.title = "끌어서 옮기기 · Alt+↑↓"; h.textContent = "⋮⋮"; return h; },
       }),
       slashExtension(ctx),
-      Pages.configure({ onPages: (n) => { if (n !== pageCount) { pageCount = Math.max(1, n); fitWidth(); } emit("pages", n); }, enabled: opts.pages !== false }),
+      Pages.configure({ onPages: (n) => { if (n !== pageCount) { pageCount = Math.max(1, n); layoutGrid(); } emit("pages", n); }, enabled: opts.pages !== false }),
     ],
     content: docFromMd(""),
-    onUpdate: () => emit("change"),
-    onSelectionUpdate: () => emit("state"),
+    onUpdate: () => { emit("change"); if (grid.on) { clearTimeout(grid.timer); grid.timer = setTimeout(refreshClones, 250); } },
+    onSelectionUpdate: () => { emit("state"); followCaret(); },
     onTransaction: () => emit("state"),
   });
 
@@ -281,12 +367,8 @@ function create(container, opts = {}) {
     destroy: () => { bb.destroy(); editor.destroy(); sheet.remove(); },
     on: (name, fn) => listeners[name].push(fn),
     pickImage: ctx.pickImage,
-    /** 두 쪽 나란히(다단) 보기: 쪽을 옆으로 세운다. 편집은 그대로 된다. 폭은 쪽 수에 맞춰 둔다 */
-    setTwo(on) {
-      sheet.classList.toggle("two", !!on);
-      twoMode = !!on;
-      fitWidth();
-    },
+    /** 격자(쪽 나란히) 보기 켜고 끄기. cols = 한 줄에 놓을 쪽 수 */
+    setGrid,
     /** 쪽 나눔 보기 켜고 끄기 */
     setPages(on) {
       editor.storage.pages.enabled = !!on;

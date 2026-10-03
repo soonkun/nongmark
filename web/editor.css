@@ -30,15 +30,15 @@
 .nm-pm p.is-empty:first-child::before { content: attr(data-placeholder); color: var(--muted); float: left; height: 0; pointer-events: none; }
 .nm-pm .nm-pagebreak.ProseMirror-selectednode, .nm-pm .ProseMirror-selectednode > div > img { outline: 2px solid var(--leaf); outline-offset: 2px; border-radius: 4px; }
 
-/* 두 쪽 나란히(다단) 보기: 한 장의 높이(297mm)에 쪽 본문 폭(170mm)짜리 단을 옆으로 세운다. 쪽 경계 위젯 자리에서 단을 넘긴다.
-   배경은 (210mm 흰 종이 + 24px 책상) 무늬라 단마다 한 장의 종이처럼 보인다. 편집은 그대로. */
-.nm-sheet.two { height: 297mm; min-height: 0; padding-bottom: 30mm; column-width: 170mm; column-gap: calc(40mm + 24px); column-fill: auto;
-  background: repeating-linear-gradient(90deg, var(--paper) 0, var(--paper) 210mm, var(--desk) 210mm, var(--desk) calc(210mm + 24px)); border: 0; box-shadow: none; }
-.nm-sheet.two .nm-pm { min-height: 0; }
-.nm-sheet.two .nm-pagegap { display: none; }
-.nm-sheet.two .nm-pagegap + * { break-before: column; }
-.nm-sheet.two .nm-pagebreak { break-after: avoid; }
-.nm-desk:has(> .nm-sheet.two) { width: max-content; margin: 0 auto; }
+/* 격자(쪽 나란히) 보기: 쪽마다 창(.nm-slot, 210×297mm)이 격자로 놓이고, 흐름(.nm-sheet)은 커서가 있는 창 안에서 그 쪽만큼 위로 밀려 보인다.
+   다른 창에는 복제본. 편집은 그대로 된다. */
+.nm-desk.grid { width: auto; }
+.nm-grid { display: grid; grid-template-columns: repeat(var(--cols, 2), 210mm); gap: 24px; justify-content: center; }
+.nm-slot { position: relative; width: 210mm; height: 297mm; overflow: hidden; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); cursor: text; }
+.nm-slot.live { border-color: var(--leaf); }
+.nm-slot > .nm-sheet, .nm-slot > .nm-sheet-clone { position: absolute; left: 0; top: 0; width: 210mm; border: 0; box-shadow: none; will-change: transform; }
+.nm-sheet-clone { pointer-events: none; user-select: none; }
+.nm-sheet-clone .nm-pagegap-desk { visibility: hidden; }
 
 /* 콜아웃 */
 .nm-callout { display: flex; gap: 12px; border-radius: 8px; padding: 10px 14px; margin: 8px 0; background: var(--note); border-left: 4px solid #3b82a6; }

@@ -122,21 +122,30 @@ with sync_playwright() as p:
     # 1280px 창, 도구 막대 접힘 48px → 80%(1293px 필요)는 안 들어가고 70%(1131px)부터 들어간다
     page.mouse.move(700, 400)
     for _ in range(2): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.1)
-    time.sleep(0.4); assert page.inner_text("#zoom-val") == "80%" and page.locator(".nm-desk:not([hidden]) .nm-sheet.two").count() == 0, "80%: 두 쪽이 안 들어가 한 단"
+    time.sleep(0.4); assert page.inner_text("#zoom-val") == "80%" and page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0, "80%: 두 쪽이 안 들어가 한 단"
     page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.6)
     print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "70%"
-    sheet = page.locator(".nm-desk:not([hidden]) .nm-sheet.two"); assert sheet.count() == 1
-    box = sheet.bounding_box(); print("두 쪽 보기: 폭", round(box["width"]), "높이", round(box["height"]), "| 쪽 수", page.inner_text("#pages"))
-    assert box["width"] > box["height"] * 1.3, "쪽이 옆으로 늘어선다"
-    xs = page.evaluate("[...document.querySelectorAll('.nm-desk:not([hidden]) .nm-pagegap + *')].map(e => Math.round(e.getBoundingClientRect().left))")
-    print("단 시작 x:", xs); assert len(set(xs)) == len(xs) and xs == sorted(xs), "쪽 경계마다 새 단"
-    page.click(".nm-desk:not([hidden]) .nm-pm h1"); page.keyboard.press("End"); page.keyboard.type(" 편집"); time.sleep(0.2)
-    assert "편집" in page.inner_text(".nm-desk:not([hidden]) .nm-pm h1"), "두 쪽 보기에서도 편집"
+    slots = page.locator(".nm-desk:not([hidden]) .nm-slot"); n = slots.count(); print("격자 보기: 창", n, "| 쪽 수", page.inner_text("#pages"))
+    assert n >= 4 and f"{n}쪽" == page.inner_text("#pages")
+    tops = page.evaluate("[...document.querySelectorAll('.nm-desk:not([hidden]) .nm-slot')].slice(0,4).map(s => Math.round(s.getBoundingClientRect().top))")
+    lefts = page.evaluate("[...document.querySelectorAll('.nm-desk:not([hidden]) .nm-slot')].slice(0,4).map(s => Math.round(s.getBoundingClientRect().left))")
+    print("1~4쪽 위치 top:", tops, "left:", lefts)
+    assert tops[0] == tops[1] and tops[2] == tops[3] and tops[2] > tops[0] and lefts[0] < lefts[1], "1·2쪽 한 줄, 그 아래 3·4쪽"
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot.live .nm-sheet").count() == 1 and page.locator(".nm-desk:not([hidden]) .nm-sheet-clone").count() == n - 1
+    # 1쪽에서 편집 → 저장 글에 반영, 복제본에도 곧 반영
+    page.click(".nm-desk:not([hidden]) .nm-slot.live .nm-pm h1"); page.keyboard.press("End"); page.keyboard.type(" 편집"); time.sleep(0.5)
+    assert "편집" in page.inner_text(".nm-desk:not([hidden]) .nm-slot.live .nm-pm h1"), "격자 보기에서도 편집"
+    # 3쪽(복제본)을 누르면 편집기가 그 창으로 옮겨 간다
+    page.click(".nm-desk:not([hidden]) .nm-slot >> nth=2", position={"x": 300, "y": 300}); time.sleep(0.4)
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot >> nth=2").locator(".nm-sheet").count() == 1, "누른 쪽으로 편집기 이동"
+    page.keyboard.type("셋째 쪽 편집"); time.sleep(0.4)
+    assert "셋째 쪽 편집" in page.evaluate("cur().ed.getMarkdown()")
     page.screenshot(path=str(ROOT / "build" / "two-pages.png"))
+    page.click(".nm-desk:not([hidden]) .nm-slot >> nth=0", position={"x": 300, "y": 400}); time.sleep(0.3)
     page.click("#btn-side"); time.sleep(0.6)  # 도구 막대를 펼치면(184px) 70%로는 두 쪽이 안 들어가 한 단으로 돌아온다
-    assert page.locator(".nm-desk:not([hidden]) .nm-sheet.two").count() == 0, "도구 막대 폭을 고려"
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0, "도구 막대 폭을 고려"
     page.click("#btn-side"); time.sleep(0.6)
-    assert page.locator(".nm-desk:not([hidden]) .nm-sheet.two").count() == 1
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4
     page.click("#zoom-val"); time.sleep(0.3)
     # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
     page.click("#btn-pages"); time.sleep(0.5)

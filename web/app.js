@@ -691,7 +691,7 @@ function setupTitlebar() {
 
 /* ---------------- 보기 ---------------- */
 
-// 책상 폭에 쪽 두 장이 들어갈 만큼 줄이면(폭 맞춤) 쪽을 나란히(다단) 놓는다 - 그대로 편집할 수 있다(CSS 다단 + 쪽 경계에서 단 넘김).
+// 책상 폭에 쪽 두 장이 들어갈 만큼 줄이면(폭 맞춤) 쪽을 1·2 / 3·4 … 격자로 놓는다 - 그대로 편집할 수 있다(편집기의 격자 보기).
 const SHEET_PX = 794 + 2; // 210mm + 테두리
 function fitsTwo() {
   // 책상(.desk) 폭 = 창 폭에서 왼쪽 도구 막대(접힘 48px·펼침 184px)를 뺀 것. 좌우 여백 20px씩을 빼고 쪽 두 장 + 사이 24px이 들어가면 다단
@@ -704,7 +704,7 @@ function setZoom(z) {
   $("#raw-wrap").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
   const two = state.zoom < 1 && fitsTwo() && state.pages;
-  for (const t of state.tabs) t.ed.setTwo(two);
+  for (const t of state.tabs) t.ed.setGrid(two, 2);
   state.two = two;
 }
 
