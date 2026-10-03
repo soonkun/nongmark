@@ -338,7 +338,7 @@ function create(container, opts = {}) {
     content: docFromMd(""),
     onUpdate: () => { emit("change"); if (grid.on) { clearTimeout(grid.timer); grid.timer = setTimeout(refreshClones, 250); } },
     onSelectionUpdate: () => { emit("state"); followCaret(); },
-    onTransaction: () => emit("state"),
+    onTransaction: ({ transaction }) => { if (transaction.docChanged || transaction.selectionSet) emit("state"); }, // 쪽 경계 갱신 같은 내부 트랜잭션엔 도구 막대를 다시 그리지 않는다
   });
 
   // 그림: 문서를 넣기 전에 그 안의 그림 주소를 data: 주소로 미리 받아 둔다(그리는 쪽은 동기라서)
@@ -358,6 +358,18 @@ function create(container, opts = {}) {
   }
 
   const bb = bubble(editor, container);
+  // 그림 정렬: 그림(img[data-align])을 감싼 상자(크기 조절 뷰의 flex 컨테이너)의 정렬을 맞춘다. CSS :has()로 하면 글자마다 재계산이라 여기서 한다
+  const alignImages = () => {
+    for (const img of sheet.querySelectorAll("img[data-src]")) {
+      const box = img.parentElement && img.parentElement.parentElement;
+      if (!box || !box.contains(img)) continue;
+      const a = img.getAttribute("data-align");
+      box.style.justifyContent = a === "center" ? "center" : a === "right" ? "flex-end" : "";
+    }
+  };
+  let alignTimer = 0;
+  editor.on("update", () => { clearTimeout(alignTimer); alignTimer = setTimeout(alignImages, 150); });
+  editor.on("create", alignImages);
 
   const handle = {
     editor,
@@ -429,7 +441,7 @@ function create(container, opts = {}) {
       };
     },
   };
-  handle.ready = handle.setMarkdown(opts.markdown || "");
+  handle.ready = handle.setMarkdown(opts.markdown || "").then(() => setTimeout(alignImages, 0));
   return handle;
 }
 

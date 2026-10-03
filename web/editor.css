@@ -81,8 +81,7 @@ body.nm-resizing { cursor: nwse-resize; user-select: none; }
 .nm-pm img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
 .nm-pm img[data-align="center"] { margin-left: auto; margin-right: auto; }
 .nm-pm img[data-align="right"] { margin-left: auto; }
-.nm-pm div:has(> div > img[data-align="center"]) { justify-content: center; }
-.nm-pm div:has(> div > img[data-align="right"]) { justify-content: flex-end; }
+/* 그림 정렬은 main.js의 alignImages()가 그림 상자(flex 컨테이너)의 justify-content를 직접 둔다 - :has()는 큰 문서에서 글자마다 스타일 재계산을 일으켜 뺐다 */
 .nm-pm img[data-align="center"], .nm-pm img[data-align="right"] { margin: 0; }
 /* 크기 조절 손잡이: 그림을 고르면 네 모서리에 초록 점 */
 .nm-pm [data-resize-handle] { width: 12px; height: 12px; background: var(--paper); border: 2px solid var(--leaf); border-radius: 50%; z-index: 2; opacity: 0; transition: opacity .12s; }

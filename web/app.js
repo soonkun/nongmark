@@ -130,7 +130,8 @@ async function addTab(doc, markdown) {
   });
   t.ed.on("change", () => { if (t === cur()) changed(); });
   t.ed.on("pages", (n) => { if (t === cur()) $("#pages").textContent = n ? `${n}쪽` : ""; });
-  t.ed.on("state", () => { if (t === cur()) fmtState(); });
+  let stateTimer = 0;
+  t.ed.on("state", () => { if (t === cur() && !stateTimer) stateTimer = setTimeout(() => { stateTimer = 0; fmtState(); }, 60); }); // 글자마다가 아니라 묶어서
   await t.ed.ready;
   state.tabs.push(t);
   showHome(false);
@@ -253,9 +254,14 @@ function setDocTitle() {
   if (NATIVE) window.nm_setTitle(name);
 }
 
+let countTimer = 0;
 function countChars() {
-  const text = docText();
-  $("#count").textContent = `${text.replace(/\s/g, "").length.toLocaleString("ko-KR")}자`;
+  // 글자 수는 문서 전체를 마크다운으로 바꿔 세므로(긴 문서는 수십 ms) 글자마다가 아니라 손이 멈춘 뒤 센다
+  clearTimeout(countTimer);
+  countTimer = setTimeout(() => {
+    const text = docText();
+    $("#count").textContent = `${text.replace(/\s/g, "").length.toLocaleString("ko-KR")}자`;
+  }, 400);
 }
 
 // 고친 내용은 자동 저장하지 않는다(한글·워드처럼). 탭의 ●와 상태 줄이 "저장 안 됨"을 알리고, Ctrl+S로 저장한다.

@@ -200,11 +200,18 @@ export const Pages = Extension.create({
       // 블록 높이 = offsetHeight + 위아래 여백(문단 사이 여백을 빼먹으면 쪽이 넘쳐 인쇄에서 쪽이 하나 더 생긴다).
       // 여백이 겹치는 만큼은 조금 넉넉히 잡히는데, 그 편이 안전하다(인쇄에서 절대 넘치지 않는다). 다단(두 쪽) 보기에서는 offsetTop이
       // 단마다 다시 시작하므로 위치 차이로는 잴 수 없고 이 방법이어야 한다.
+      // 여백은 요소 종류(태그·클래스)마다 같으므로 한 번 재고 기억한다 - 글자마다 getComputedStyle을 전부 다시 부르지 않게
       const extent = new Map();
       for (const a of view.dom.children) {
         if (a.classList.contains("nm-pagegap")) continue;
-        const cs = getComputedStyle(a);
-        extent.set(a, a.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0));
+        const key = a.tagName + "." + a.className;
+        let m = marginCache.get(key);
+        if (m === undefined) {
+          const cs = getComputedStyle(a);
+          m = (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+          marginCache.set(key, m);
+        }
+        extent.set(a, a.offsetHeight + m);
       }
       const LIMIT = PAGE.contentH - 6; // 인쇄 엔진과의 반올림 차이 여유
       let y = 0, page = 1, force = false;
@@ -222,7 +229,7 @@ export const Pages = Extension.create({
         force = false;
         y += h;
       });
-      const sig = breaks.map((b) => b.join(":")).join(",") + "|" + Math.round(y);
+      const sig = breaks.map((b) => b.join(":")).join(","); // 마지막 쪽의 남은 높이는 패딩으로만 바뀌니 트랜잭션을 만들지 않는다
       const sheet = view.dom.closest(".nm-sheet");
       if (sheet) sheet.style.paddingBottom = sheet.classList.contains("two") ? "" : Math.max(0, PAGE.contentH - y) + PAGE.bottom + "px"; // 마지막 쪽도 A4 한 장을 채운다(두 쪽 보기는 높이 고정)
       if (ext.options.onPages) ext.options.onPages(page);
@@ -230,7 +237,9 @@ export const Pages = Extension.create({
       lastSig = sig;
       view.dispatch(view.state.tr.setMeta(pagesKey, breaks));
     };
-    const schedule = (view) => { if (!scheduled) scheduled = requestAnimationFrame(() => measure(view)); };
+    const marginCache = new Map();
+    // 글자를 치는 동안 매 프레임 재지 않고 손이 멈춘 뒤(120ms) 한 번 잰다 - 쪽 경계는 그 사이 조금 늦게 따라와도 된다
+    const schedule = (view) => { if (scheduled) clearTimeout(scheduled); scheduled = setTimeout(() => { scheduled = 0; measure(view); }, 120); };
     return [
       new Plugin({
         key: pagesKey,
@@ -250,7 +259,7 @@ export const Pages = Extension.create({
           schedule(view);
           const ro = new ResizeObserver(() => schedule(view));
           ro.observe(view.dom);
-          return { update: () => schedule(view), destroy: () => { ro.disconnect(); if (scheduled) cancelAnimationFrame(scheduled); } };
+          return { update: () => schedule(view), destroy: () => { ro.disconnect(); if (scheduled) clearTimeout(scheduled); } };
         },
       }),
     ];
