@@ -26,6 +26,8 @@ type Chromium struct {
 	webResourceRequested  *iCoreWebView2WebResourceRequestedEventHandler
 	acceleratorKeyPressed *ICoreWebView2AcceleratorKeyPressedEventHandler
 	navigationCompleted   *ICoreWebView2NavigationCompletedEventHandler
+	navigationStarting    *ICoreWebView2NavigationStartingEventHandler // 농막: 이동 차단
+	newWindowRequested    *ICoreWebView2NewWindowRequestedEventHandler // 농막: 새 창 차단
 
 	environment *ICoreWebView2Environment
 
@@ -63,6 +65,8 @@ func NewChromium() *Chromium {
 	e.webResourceRequested = newICoreWebView2WebResourceRequestedEventHandler(e)
 	e.acceleratorKeyPressed = newICoreWebView2AcceleratorKeyPressedEventHandler(e)
 	e.navigationCompleted = newICoreWebView2NavigationCompletedEventHandler(e)
+	e.navigationStarting = newICoreWebView2NavigationStartingEventHandler(e)
+	e.newWindowRequested = newICoreWebView2NewWindowRequestedEventHandler(e)
 	e.permissions = make(map[CoreWebView2PermissionKind]CoreWebView2PermissionState)
 
 	return e
@@ -217,6 +221,17 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 		uintptr(unsafe.Pointer(e.navigationCompleted)),
 		uintptr(unsafe.Pointer(&token)),
 	)
+	// 농막: 이 창은 about:blank(SetHtml) 말고 어디로도 가지 않고, 새 창도 열지 않는다
+	_, _, _ = e.webview.vtbl.AddNavigationStarting.Call(
+		uintptr(unsafe.Pointer(e.webview)),
+		uintptr(unsafe.Pointer(e.navigationStarting)),
+		uintptr(unsafe.Pointer(&token)),
+	)
+	_, _, _ = e.webview.vtbl.AddNewWindowRequested.Call(
+		uintptr(unsafe.Pointer(e.webview)),
+		uintptr(unsafe.Pointer(e.newWindowRequested)),
+		uintptr(unsafe.Pointer(&token)),
+	)
 
 	_ = e.controller.AddAcceleratorKeyPressed(e.acceleratorKeyPressed, &token)
 
@@ -229,7 +244,32 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 	return 0
 }
 
+// NavigationStarting: about:blank(우리가 SetHtml로 넣는 화면)만 허용. 문서 안 링크 클릭·드롭한 파일·주소 입력 등 다른 이동은 모두 취소.
+func (e *Chromium) NavigationStarting(sender *ICoreWebView2, args *ICoreWebView2NavigationStartingEventArgs) uintptr {
+	uri, _ := args.GetUri()
+	if uri != "about:blank" {
+		_ = args.PutCancel(true)
+	}
+	return 0
+}
+
+// NewWindowRequested: 처리됨으로 표시해 새 창(브라우저)이 열리지 않게 한다.
+func (e *Chromium) NewWindowRequested(sender *ICoreWebView2, args *ICoreWebView2NewWindowRequestedEventArgs) uintptr {
+	_ = args.PutHandled(true)
+	return 0
+}
+
 func (e *Chromium) MessageReceived(sender *ICoreWebView2, args *iCoreWebView2WebMessageReceivedEventArgs) uintptr {
+	// 농막: 우리 화면(about:blank)에서 온 메시지만 받는다
+	var source *uint16
+	_, _, _ = args.vtbl.GetSource.Call(uintptr(unsafe.Pointer(args)), uintptr(unsafe.Pointer(&source)))
+	if source != nil {
+		src := w32.Utf16PtrToString(source)
+		windows.CoTaskMemFree(unsafe.Pointer(source))
+		if src != "about:blank" {
+			return 0
+		}
+	}
 	var message *uint16
 	_, _, _ = args.vtbl.TryGetWebMessageAsString.Call(
 		uintptr(unsafe.Pointer(args)),

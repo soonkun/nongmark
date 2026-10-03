@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"nongmark/internal/loader"
 	"nongmark/internal/webview"
@@ -58,6 +59,21 @@ func main() {
 		}
 		return nil, errors.New("열지 않은 폴더입니다")
 	}
+	// 탭을 닫아 더 쓰지 않는 폴더는 등록을 푼다(os.Root 핸들이 남아 폴더를 못 지우는 일이 없게)
+	release := func(dir string) {
+		mu.Lock()
+		defer mu.Unlock()
+		if ws, ok := opened[dir]; ok {
+			ws.fsroot.Close()
+			delete(opened, dir)
+		}
+	}
+	recent := newRecentList()
+	noteRecent := func(i info) {
+		if i.Dir != "" && i.Open != "" {
+			recent.Add(filepath.Join(i.Dir, filepath.FromSlash(i.Open)))
+		}
+	}
 	ws := &workspace{}
 	first := info{}
 	if len(os.Args) > 1 && os.Args[1] != "" {
@@ -66,6 +82,7 @@ func main() {
 			return
 		}
 		first, _ = register(ws)
+		noteRecent(first)
 	}
 	data := filepath.Join(os.Getenv("LOCALAPPDATA"), "Nongmark", "WebView2")
 	w := webview.NewWithOptions(webview.WebViewOptions{
@@ -136,16 +153,30 @@ func main() {
 		if err := ws.openTarget(p); err != nil {
 			return info{}, err
 		}
-		return register(ws)
+		i, err := register(ws)
+		if err == nil {
+			noteRecent(i)
+		}
+		return i, err
 	})
-	// 대문의 "최근 문서": 화면이 기억해 둔 전체 경로를 다시 연다. 더블클릭으로 연 것과 같은 길(.md만, 그 폴더를 등록).
-	must("nm_openRecent", func(full string) (info, error) {
+	// 대문의 "최근 문서": 프로그램이 보관한 목록(recent.json)을 번호로 연다 - 화면은 경로를 고를 수 없다
+	must("nm_recent", func() ([]recentItem, error) { return recent.List(), nil })
+	must("nm_openRecent", func(index int) (info, error) {
+		it, ok := recent.Get(index)
+		if !ok {
+			return info{}, errors.New("최근 문서 목록에 없습니다")
+		}
 		ws := &workspace{}
-		if err := ws.openTarget(full); err != nil {
+		if err := ws.openTarget(it.Full); err != nil {
 			return info{}, err
 		}
-		return register(ws)
+		i, err := register(ws)
+		if err == nil {
+			noteRecent(i)
+		}
+		return i, err
 	})
+	must("nm_release", func(dir string) { release(dir) })
 	// 다른 이름으로 저장: 어디든 고른 곳에 쓰고, 그 폴더를 등록한다.
 	must("nm_saveAs", func(suggest, text string) (info, error) {
 		p := saveFileDialog(hwnd(w), suggest)
@@ -167,9 +198,9 @@ func main() {
 		if err := ws.Write(filepath.Base(p), text); err != nil {
 			return info{}, err
 		}
+		noteRecent(i)
 		return i, nil
 	})
-	must("nm_alert", func(text string) { showInfo(cut(text, 2000)) })
 	// 내보내기(hwpx 등): 사용자가 저장 창에서 고른 곳에만 쓴다. 확장자는 hwpx·pdf만.
 	must("nm_saveBytes", func(suggest, ext, b64 string) (string, error) {
 		if ext != "hwpx" && ext != "pdf" {
@@ -183,6 +214,9 @@ func main() {
 		if p == "" {
 			return "", nil
 		}
+		if strings.HasPrefix(p, `\\`) { // nm_saveAs와 같은 규칙: 네트워크 경로에는 쓰지 않는다
+			return "", errors.New(`네트워크 경로(\\서버\공유)에는 저장하지 않습니다`)
+		}
 		if !strings.EqualFold(filepath.Ext(p), "."+ext) {
 			p += "." + ext
 		}
@@ -191,7 +225,11 @@ func main() {
 	w.Init("window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;")
 	w.SetFrameless(true)
 	// 창을 닫으려 하면(단추·Alt+F4·작업 표시줄) 화면에 먼저 묻는다 - 저장 안 된 문서가 있으면 저장할지 묻고 "close-now"로 답한다
-	w.SetCloseHook(func() { w.Eval("window.nmRequestClose && window.nmRequestClose()") })
+	// 화면이 10초 안에 답하지 않으면(멈춤 등) 그냥 닫는다
+	w.SetCloseHook(func() {
+		w.Eval("window.nmRequestClose && window.nmRequestClose()")
+		time.AfterFunc(10*time.Second, func() { w.Dispatch(func() { w.WindowCommand("close-now") }) })
+	})
 	w.SetHtml(page)
 	w.Run()
 }

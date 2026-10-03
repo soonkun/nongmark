@@ -19,6 +19,8 @@ const MD_EXT = /\.(md|markdown)$/i;
 /* ---------------- 저장소 ---------------- */
 
 const NATIVE = !!window.NONGMAK_NATIVE;
+// 겹겹이 막기: 편집기 라이브러리 어딘가에서 창을 열거나 주소를 옮기려 해도 못 하게 한다(링크는 Ctrl+클릭 → followLink가 .md만 연다)
+try { window.open = () => null; } catch { /* 무시 */ }
 
 function blobToBase64(blob) {
   return new Promise((ok, fail) => {
@@ -129,10 +131,6 @@ async function addTab(doc, markdown) {
   t.ed.on("change", () => { if (t === cur()) changed(); });
   t.ed.on("pages", (n) => { if (t === cur()) $("#pages").textContent = n ? `${n}쪽` : ""; });
   t.ed.on("state", () => { if (t === cur()) fmtState(); });
-  t.host.addEventListener("click", (ev) => {
-    const a = ev.target.closest("a[href]");
-    if (a && ev.ctrlKey) { ev.preventDefault(); followLink(a.getAttribute("href")); } // 편집 중엔 Ctrl+클릭이 링크 열기
-  });
   await t.ed.ready;
   state.tabs.push(t);
   showHome(false);
@@ -166,6 +164,7 @@ async function closeTab(j) {
   t.ed.destroy();
   t.host.remove();
   state.tabs.splice(j, 1);
+  if (NATIVE && window.nm_release && t.store?.kind === "native" && !state.tabs.some((x) => x.store?.dir === t.store.dir)) window.nm_release(t.store.dir); // 폴더 등록 해제
   if (!state.tabs.length) {
     state.tab = -1;
     renderTabs();
@@ -202,7 +201,6 @@ async function openPath(store, path) {
   try {
     const text = await store.read(path);
     await addTab({ store, path }, text);
-    rememberRecent(store, path);
   } catch (e) {
     status("열지 못했습니다: " + (e.message || e), "error");
   }
@@ -220,38 +218,27 @@ function showHome(on) {
   }
 }
 
-function recentList() {
-  try { return JSON.parse(localStorage.getItem("nongmak.recent") || "[]"); } catch { return []; }
-}
-
-function rememberRecent(store, path) {
-  if (store.kind !== "native" || !path) return;
-  const full = store.dir + "\\" + path.replace(/\//g, "\\");
-  const list = [{ full, name: path.split("/").pop().replace(MD_EXT, "") }, ...recentList().filter((r) => r.full !== full)].slice(0, 8);
-  try { localStorage.setItem("nongmak.recent", JSON.stringify(list)); } catch { /* 기억 못 해도 된다 */ }
-}
-
-function renderRecent() {
-  const list = recentList();
-  $("#w-recent").hidden = !NATIVE || !list.length;
+// 최근 문서 목록은 프로그램(Go)이 보관하고 번호로만 연다 - 화면이 임의 경로를 열 수 없다(보안 검토 L1)
+async function renderRecent() {
+  const list = NATIVE && window.nm_recent ? await window.nm_recent().catch(() => []) : [];
+  $("#w-recent").hidden = !list || !list.length;
   const box = $("#w-recent-list");
   box.textContent = "";
-  for (const r of list) {
+  (list || []).forEach((r, k) => {
     const b = el("button");
     b.append(el("span", "r-name", r.name), el("span", "r-path", r.full));
     b.title = r.full;
     b.onclick = async () => {
       try {
-        const info = await window.nm_openRecent(r.full);
+        const info = await window.nm_openRecent(k);
         if (info && info.root) await openPath(nativeStore(info), info.open);
       } catch (e) {
         status("열지 못했습니다(옮겨졌거나 지워진 문서): " + e, "error");
-        try { localStorage.setItem("nongmak.recent", JSON.stringify(list.filter((x) => x.full !== r.full))); } catch { /* 무시 */ }
         renderRecent();
       }
     };
     box.append(b);
-  }
+  });
 }
 
 /* ---------------- 문서 글·저장 ---------------- */
@@ -705,7 +692,6 @@ async function saveAs() {
       t.dirty = false;
       renderTabs();
       setDocTitle();
-      rememberRecent(t.store, t.path);
       status("저장됨", "ok");
       return true;
     } catch (e) {
@@ -864,6 +850,15 @@ async function start() {
     "m-close": () => closeTab(state.tab),
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
+  // 이 창은 어디로도 이동하지 않는다(프로그램 쪽에서도 막지만 화면에서도): 미리보기·인쇄 쪽의 링크는 followLink로, 끌어다 놓은 파일은 무시
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest("a[href]");
+    if (!a) return;
+    ev.preventDefault();
+    if (!a.closest(".nm-pm") || ev.ctrlKey) followLink(a.getAttribute("href") || "");
+  }, true);
+  for (const type of ["dragover", "drop"]) document.addEventListener(type, (ev) => { if (!ev.target.closest?.(".nm-pm")) ev.preventDefault(); });
+  document.addEventListener("drop", (ev) => { if (!ev.defaultPrevented) ev.preventDefault(); });
   $("#tab-add").onclick = newDocument;
   $("#w-new").onclick = newDocument;
   $("#w-file").onclick = openDialog;

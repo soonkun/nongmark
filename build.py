@@ -70,9 +70,27 @@ def build_editor() -> str:
     """편집기 묶음을 만든다(node_modules가 있어야 한다: cd web/editor-app && npm ci). 묶음 안에 코드 실행 API가 있으면 멈춘다."""
     subprocess.run([str(NODE), str(EDITOR_APP / "build.mjs")], check=True)
     js = BUNDLE.read_text(encoding="utf-8")
-    bad = [m.group(0) for m in re.finditer(r"\beval\s*\(|\bnew\s+Function\b|\bXMLHttpRequest\b|\bWebSocket\b|\bimportScripts\b|document\.write\b", js)]
-    if bad:
-        sys.exit("편집기 묶음에 금지 API가 있어 빌드를 멈춥니다: " + ", ".join(sorted(set(bad))))
+    # 화면 코드와 같은 금지 목록을 묶음에도 적용한다. 라이브러리 안의 알려진 무해 항목만 예외:
+    #   window.open( - Tiptap Link 확장의 클릭 처리(openOnClick:false라 비활성, app.js가 window.open을 null 함수로 덮음)
+    #   오류 문구 안의 문서 링크 두 개(prosemirror.net 안내, yjs 이슈 주소) - 글자일 뿐 연결하지 않는다
+    #   obj.fetch(  - 객체의 메서드(제안 메뉴의 항목 가져오기). window/globalThis/self.fetch( 는 그대로 잡는다
+    #   typeof location== - 환경 검사(lib0). 주소를 바꾸는 location= 대입은 그대로 잡는다
+    allowed = {"window.open(": 1, "https://prosemirror.net": 1, "https://github.com": 1}
+    code = strip_comments(js)
+    problems = {}
+    for pattern, why in FORBIDDEN:
+        for m in re.finditer(pattern, code):
+            before = code[max(0, m.start() - 12):m.start()]
+            if m.group(0).startswith("fetch") and before.endswith(".") and not re.search(r"(window|globalThis|self)\.$", before):
+                continue
+            if m.group(0) == "location=" and before.endswith("typeof "):
+                continue
+            problems[m.group(0)] = why
+    for text, n in allowed.items():
+        if code.count(text) <= n:
+            problems.pop(text, None)
+    if problems:
+        sys.exit("편집기 묶음에 금지 API가 있어 빌드를 멈춥니다:\n" + "\n".join(f"  {why}: {t!r}" for t, why in problems.items()))
     return js
 
 
