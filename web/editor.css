@@ -30,6 +30,16 @@
 .nm-pm p.is-empty:first-child::before { content: attr(data-placeholder); color: var(--muted); float: left; height: 0; pointer-events: none; }
 .nm-pm .nm-pagebreak.ProseMirror-selectednode, .nm-pm .ProseMirror-selectednode > div > img { outline: 2px solid var(--leaf); outline-offset: 2px; border-radius: 4px; }
 
+/* 두 쪽 나란히(다단) 보기: 한 장의 높이(297mm)에 쪽 본문 폭(170mm)짜리 단을 옆으로 세운다. 쪽 경계 위젯 자리에서 단을 넘긴다.
+   배경은 (210mm 흰 종이 + 24px 책상) 무늬라 단마다 한 장의 종이처럼 보인다. 편집은 그대로. */
+.nm-sheet.two { height: 297mm; min-height: 0; padding-bottom: 30mm; column-width: 170mm; column-gap: calc(40mm + 24px); column-fill: auto;
+  background: repeating-linear-gradient(90deg, var(--paper) 0, var(--paper) 210mm, var(--desk) 210mm, var(--desk) calc(210mm + 24px)); border: 0; box-shadow: none; }
+.nm-sheet.two .nm-pm { min-height: 0; }
+.nm-sheet.two .nm-pagegap { display: none; }
+.nm-sheet.two .nm-pagegap + * { break-before: column; }
+.nm-sheet.two .nm-pagebreak { break-after: avoid; }
+.nm-desk:has(> .nm-sheet.two) { width: max-content; margin: 0 auto; }
+
 /* 콜아웃 */
 .nm-callout { display: flex; gap: 12px; border-radius: 8px; padding: 10px 14px; margin: 8px 0; background: var(--note); border-left: 4px solid #3b82a6; }
 .nm-callout-label { flex: none; align-self: flex-start; border: 0; background: color-mix(in srgb, var(--paper) 60%, transparent); border-radius: 6px; padding: 2px 8px; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer; margin-top: 4px; }

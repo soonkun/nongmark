@@ -1,3 +1,3 @@
 @echo off
-rem Nongmark: per-user install (no admin). Copies nongmark.exe to %LOCALAPPDATA%\Programs\Nongmark and registers .md files.
+rem Nongmark setup: asks all-users (Program Files, UAC) or current-user (%LOCALAPPDATA%\Programs\Nongmark), desktop shortcut; registers .md files and an Apps & features entry.
 "%~dp0nongmark.exe" --install

@@ -135,8 +135,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .raw-wrap { width: 210mm; margin: 0 auto; }
 .editors { position: relative; }
 .print-doc { position: absolute; left: -10000px; top: 0; width: 170mm; } /* 인쇄용 복제본은 화면 밖에 두었다가 인쇄할 때만 보인다 */
-.preview { cursor: zoom-in; } .preview .sheet { cursor: zoom-in; } .preview .sheet-body { overflow: hidden; }
-.preview .nm-pagebreak, .print-doc .nm-pagebreak { display: none; }
+.print-doc .nm-pagebreak { display: none; }
 .zoom { display: inline-flex; align-items: center; }
 .zoom .icon-btn { padding: 0 6px; font-size: 12px; }
 
@@ -166,7 +165,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 @page { size: A4; margin: 30mm 20mm; }
 @media print {
   html, body, .desk { background: #fff !important; height: auto; }
-  .tabs, .menubar, .rail, .statusbar, .editors, .raw-wrap, .preview, .ask-back { display: none !important; }
+  .tabs, .menubar, .rail, .statusbar, .editors, .raw-wrap, .ask-back { display: none !important; }
   .app { display: block; } .body { display: block; } .desk { padding: 0; overflow: visible; }
   .print-doc { position: static; width: auto; }
   .print-doc .nm-pm { min-height: 0; color: #000; }

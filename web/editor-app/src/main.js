@@ -214,6 +214,9 @@ function create(container, opts = {}) {
   };
   const listeners = { change: [], pages: [], state: [] };
   const emit = (name, ...a) => listeners[name].forEach((fn) => fn(...a));
+  let twoMode = false, pageCount = 1;
+  const PAGE_W = Math.round(210 * 96 / 25.4), GAP_W = 24; // 쪽 한 장의 폭(px)과 쪽 사이 간격
+  const fitWidth = () => { sheet.style.width = twoMode ? pageCount * (PAGE_W + GAP_W) - GAP_W + "px" : ""; };
 
   const editor = new Editor({
     element: sheet,
@@ -244,7 +247,7 @@ function create(container, opts = {}) {
         render: () => { const h = el("div", "nm-handle"); h.title = "끌어서 옮기기 · Alt+↑↓"; h.textContent = "⋮⋮"; return h; },
       }),
       slashExtension(ctx),
-      Pages.configure({ onPages: (n) => emit("pages", n), enabled: opts.pages !== false }),
+      Pages.configure({ onPages: (n) => { if (n !== pageCount) { pageCount = Math.max(1, n); fitWidth(); } emit("pages", n); }, enabled: opts.pages !== false }),
     ],
     content: docFromMd(""),
     onUpdate: () => emit("change"),
@@ -278,6 +281,12 @@ function create(container, opts = {}) {
     destroy: () => { bb.destroy(); editor.destroy(); sheet.remove(); },
     on: (name, fn) => listeners[name].push(fn),
     pickImage: ctx.pickImage,
+    /** 두 쪽 나란히(다단) 보기: 쪽을 옆으로 세운다. 편집은 그대로 된다. 폭은 쪽 수에 맞춰 둔다 */
+    setTwo(on) {
+      sheet.classList.toggle("two", !!on);
+      twoMode = !!on;
+      fitWidth();
+    },
     /** 쪽 나눔 보기 켜고 끄기 */
     setPages(on) {
       editor.storage.pages.enabled = !!on;

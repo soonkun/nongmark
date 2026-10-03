@@ -20,9 +20,11 @@ var (
 )
 
 const (
-	csidlDesktopDir = 0x0010 // 바탕화면(사용자)
-	csidlPrograms   = 0x0002 // 시작 메뉴 > 프로그램(사용자)
-	shortcutName    = "새싹이의 농막.lnk"
+	csidlDesktopDir     = 0x0010 // 바탕화면(사용자)
+	csidlPrograms       = 0x0002 // 시작 메뉴 > 프로그램(사용자)
+	csidlCommonDesktop  = 0x0019 // 바탕화면(모든 사용자)
+	csidlCommonPrograms = 0x0017 // 시작 메뉴 > 프로그램(모든 사용자)
+	shortcutName        = "새싹이의 농막.lnk"
 )
 
 type guid struct {
@@ -93,10 +95,14 @@ func writeShortcut(path, target, description string) error {
 	return nil
 }
 
-// installShortcuts: 바탕화면·시작 메뉴에 바로 가기. 실패는 설치를 멈추지 않고 알려만 준다.
-func installShortcuts(target string) []string {
+// installShortcuts: 시작 메뉴(늘)와 바탕화면(desktop이면)에 바로 가기. 실패는 설치를 멈추지 않고 알려만 준다.
+func installShortcuts(target string, startCsidl int, desktop bool, desktopCsidl int) []string {
 	var problems []string
-	for _, csidl := range []int{csidlDesktopDir, csidlPrograms} {
+	places := []int{startCsidl}
+	if desktop {
+		places = append(places, desktopCsidl)
+	}
+	for _, csidl := range places {
 		dir, err := knownFolder(csidl)
 		if err != nil {
 			problems = append(problems, err.Error())
@@ -109,8 +115,8 @@ func installShortcuts(target string) []string {
 	return problems
 }
 
-func removeShortcuts() {
-	for _, csidl := range []int{csidlDesktopDir, csidlPrograms} {
+func removeShortcuts(csidls ...int) {
+	for _, csidl := range csidls {
 		if dir, err := knownFolder(csidl); err == nil {
 			_ = os.Remove(filepath.Join(dir, shortcutName))
 		}

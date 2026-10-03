@@ -146,7 +146,7 @@ async function activate(j) {
   const t = cur();
   t.host.hidden = false;
   if (state.raw) $("#raw").value = t.ed.getMarkdown();
-  if (state.zoom < 1) await setZoom(state.zoom);
+  if (state.zoom < 1) setZoom(state.zoom);
   renderTabs();
   setDocTitle();
   countChars();
@@ -521,19 +521,6 @@ function cloneEditorContent(t) {
   return pm;
 }
 
-/** 쪽 경계마다 .sheet로 나눈 복제본(두 쪽 미리보기용). 쪽 나눔 끔이면 한 장. */
-function sheetsFromEditor(t, target) {
-  target.textContent = "";
-  const pm = cloneEditorContent(t);
-  let body = null, n = 0;
-  const open = () => { const sheet = el("section", "sheet"); body = el("div", "sheet-body nm-pm"); sheet.append(body, el("div", "sheet-no", `- ${++n} -`)); target.append(sheet); };
-  open();
-  for (const node of [...pm.childNodes]) {
-    if (node.classList?.contains("nm-pagegap")) { open(); continue; }
-    body.append(node);
-  }
-}
-
 async function printDoc(pdfHint) {
   const t = cur();
   if (!t) return;
@@ -704,34 +691,21 @@ function setupTitlebar() {
 
 /* ---------------- 보기 ---------------- */
 
-// 책상 폭에 쪽 두 장이 들어갈 만큼 줄이면(폭 맞춤) 쪽을 나란히 놓는 미리보기(읽기 전용)로 바뀐다 - 편집기는 한 흐름이라
-// 쪽을 옆으로 세울 수 없어서, 인쇄에 쓰는 쪽 그리기(표는 줄 단위로 잘림)로 보여 준다. 쪽을 누르면 100%로 돌아와 다시 고친다.
+// 책상 폭에 쪽 두 장이 들어갈 만큼 줄이면(폭 맞춤) 쪽을 나란히(다단) 놓는다 - 그대로 편집할 수 있다(CSS 다단 + 쪽 경계에서 단 넘김).
 const SHEET_PX = 794 + 2; // 210mm + 테두리
 function fitsTwo() {
   // 책상(.desk) 폭 = 창 폭에서 왼쪽 도구 막대(접힘 48px·펼침 184px)를 뺀 것. 좌우 여백 20px씩을 빼고 쪽 두 장 + 사이 24px이 들어가면 다단
   return $(".desk").clientWidth - 40 >= (2 * SHEET_PX + 24) * state.zoom;
 }
 
-async function setZoom(z) {
+function setZoom(z) {
   state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 10) / 10;
   $("#editors").style.zoom = state.zoom;
   $("#raw-wrap").style.zoom = state.zoom;
-  $("#preview").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
-  const preview = state.zoom < 1 && fitsTwo() && !state.raw && state.pages && cur();
-  if (preview) {
-    const t = cur();
-    if (state.previewFor !== t || state.previewText !== docText()) {
-      state.previewFor = t;
-      state.previewText = docText();
-      sheetsFromEditor(t, $("#preview"));
-    }
-    status("쪽 미리보기(읽기 전용) · 쪽을 누르거나 Ctrl+0을 누르면 편집으로 돌아갑니다");
-  } else state.previewFor = null;
-  $("#preview").hidden = !preview;
-  $("#editors").hidden = !!preview || state.raw;
-  $("#rail").classList.toggle("off", !!preview || state.raw);
-  if (!preview && cur()) setDocTitle(), fmtState();
+  const two = state.zoom < 1 && fitsTwo() && state.pages;
+  for (const t of state.tabs) t.ed.setTwo(two);
+  state.two = two;
 }
 
 function setPages(on) {
@@ -809,7 +783,6 @@ async function start() {
     ev.preventDefault();
     setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
-  $("#preview").addEventListener("click", () => { setZoom(1); cur()?.ed.focus(); });
   let resizeTimer = null;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.zoom < 1) setZoom(state.zoom); }, 150); }); // 창 폭이 바뀌면 두 쪽이 들어가는지 다시 본다
   $("#zoom-in").onclick = () => setZoom(state.zoom + 0.1);

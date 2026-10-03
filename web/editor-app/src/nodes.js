@@ -197,16 +197,14 @@ export const Pages = Extension.create({
       }
       const doc = view.state.doc;
       const breaks = []; // [pos, remaining, pageNo]
-      // 블록 높이는 '다음 형제의 시작 - 내 시작'으로 잰다(문단 사이 여백까지 포함 - offsetHeight만 더하면 여백만큼 쪽이 넘쳐 인쇄에서 쪽이 하나 더 생긴다).
-      // 쪽 경계 위젯은 형제로 끼어 있으므로 그 높이는 뺀다.
-      const kids = [...view.dom.children];
+      // 블록 높이 = offsetHeight + 위아래 여백(문단 사이 여백을 빼먹으면 쪽이 넘쳐 인쇄에서 쪽이 하나 더 생긴다).
+      // 여백이 겹치는 만큼은 조금 넉넉히 잡히는데, 그 편이 안전하다(인쇄에서 절대 넘치지 않는다). 다단(두 쪽) 보기에서는 offsetTop이
+      // 단마다 다시 시작하므로 위치 차이로는 잴 수 없고 이 방법이어야 한다.
       const extent = new Map();
-      for (let k = 0; k < kids.length; k++) {
-        const a = kids[k];
-        let next = kids[k + 1];
-        while (next && next.classList.contains("nm-pagegap")) next = kids[kids.indexOf(next) + 1];
-        const h = next ? next.offsetTop - a.offsetTop - (kids[k + 1] && kids[k + 1].classList.contains("nm-pagegap") ? kids[k + 1].offsetHeight : 0) : a.offsetHeight;
-        extent.set(a, Math.max(0, h));
+      for (const a of view.dom.children) {
+        if (a.classList.contains("nm-pagegap")) continue;
+        const cs = getComputedStyle(a);
+        extent.set(a, a.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0));
       }
       const LIMIT = PAGE.contentH - 6; // 인쇄 엔진과의 반올림 차이 여유
       let y = 0, page = 1, force = false;
@@ -226,7 +224,7 @@ export const Pages = Extension.create({
       });
       const sig = breaks.map((b) => b.join(":")).join(",") + "|" + Math.round(y);
       const sheet = view.dom.closest(".nm-sheet");
-      if (sheet) sheet.style.paddingBottom = Math.max(0, PAGE.contentH - y) + PAGE.bottom + "px"; // 마지막 쪽도 A4 한 장을 채운다
+      if (sheet) sheet.style.paddingBottom = sheet.classList.contains("two") ? "" : Math.max(0, PAGE.contentH - y) + PAGE.bottom + "px"; // 마지막 쪽도 A4 한 장을 채운다(두 쪽 보기는 높이 고정)
       if (ext.options.onPages) ext.options.onPages(page);
       if (sig === lastSig) return;
       lastSig = sig;

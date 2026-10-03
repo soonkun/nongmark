@@ -9,7 +9,7 @@
 |---|---|
 | `nongmark.exe` | 프로그램(영어 이름 nongmark). 아이콘·버전 정보 포함 |
 | `WebView2Loader.dll` | 마이크로소프트가 서명한 WebView2 연결 파일(NuGet `Microsoft.Web.WebView2` 1.0.4258.31). exe와 같은 폴더에 둔다 |
-| `install.cmd` / `uninstall.cmd` | 현재 사용자에게 설치·.md 연결 / 해제(관리자 권한 불필요) |
+| `install.cmd` / `uninstall.cmd` | 설치 / 제거. 설치 때 범위(모든 사용자 = Program Files·관리자 승인 / 현재 사용자 = 승인 없음)와 바탕화면 바로 가기를 묻는다 |
 | `nongmark.html` | 프로그램 없이 Edge·Chrome으로 여는 판(파일 하나 열기·내려받기 저장) |
 | `SHA256SUMS.txt` | 위 파일들의 SHA-256 — `certutil -hashfile nongmark.exe SHA256`으로 대조 |
 
@@ -17,7 +17,8 @@
 이전 이름(nongmak.exe, `Programs\Nongmak`)으로 설치했던 PC는 새 `install.cmd`가 옛 등록을 지우고 새로 등록한다. 옛 폴더 `%LOCALAPPDATA%\Programs\Nongmak`은 손으로 지우면 된다.
 
 1. 여섯 파일을 한 폴더에 둔다(예: USB → 바탕화면\농막). 해시를 대조한다.
-2. `install.cmd` 더블클릭 → "설치했습니다" 창. 프로그램은 `%LOCALAPPDATA%\Programs\Nongmark\`에 복사되고, **바탕화면과 시작 메뉴에 "새싹이의 농막" 바로 가기**가 생긴다(제거하면 같이 지워진다).
+2. `install.cmd` 더블클릭 → 묻는 대로 고른다: **모든 사용자용**(`C:\Program Files\Nongmark`, 관리자 승인 창이 뜬다) 또는 **현재 사용자만**(`%LOCALAPPDATA%\Programs\Nongmark`, 승인 없음) → **바탕화면 바로 가기** 여부.
+   시작 메뉴 바로 가기와 **설정 > 앱("앱 및 기능")** 항목은 늘 만든다 - 제거는 거기서(또는 `uninstall.cmd`). 제거하면 바로 가기·연결·설치 폴더가 지워지고 문서(.md)는 남는다.
 3. `.md` 파일을 더블클릭하면 농막 창으로 열린다.
    - 이미 다른 프로그램으로 열리게 정해져 있었다면 한 번만: 파일 오른쪽 단추 → **연결 프로그램** → **다른 앱 선택** → **새싹이의 농막** → **항상 이 앱 사용**. (Windows가 사용자가 고른 연결을 프로그램이 바꾸지 못하게 막는다.)
    - 처음 실행할 때 파란 "**Windows의 PC 보호**"(SmartScreen) 창이 뜰 수 있다 - 서명 없는 새 프로그램이라는 뜻이지 악성 판정이 아니다. **추가 정보 → 실행**을 누르면 그 PC에서는 다시 묻지 않는다.
@@ -65,7 +66,7 @@
   WebMessage는 about:blank에서 온 것만 받는다. 화면 쪽에서도 모든 링크 클릭·파일 드롭의 기본 동작을 막고 `window.open`을 빈 함수로 덮는다.
   최근 문서 목록은 프로그램이 `%LOCALAPPDATA%\Nongmark\recent.json`에 보관하고 화면은 번호로만 고른다(화면이 임의 경로를 열 수 없다). 탭을 다 닫은 폴더는 등록을 푼다.
 - **창**: 시스템 제목 줄은 WM_NCCALCSIZE로 위쪽만 떼어 냈다(창 스타일은 그대로라 테두리·그림자·화면 끝 붙이기 유지). 화면이 부탁하는 창 조작(`nm_win`)은 끌기·위쪽 크기 조절·최소화·최대화·닫기뿐.
-- **설치는 현재 사용자 범위만**: 관리자 권한·서비스·시작 프로그램 등록 없음. 레지스트리는 `HKCU\Software\Classes`의 연결 키만(`app/install_windows.go`에 전부). 시스템 DLL은 System32 전체 경로로만.
+- **설치**: 서비스·시작 프로그램·예약 작업 등록 없음. 레지스트리는 파일 연결 키(`Software\Classes`)와 "앱 및 기능" 항목(`…\Uninstall\Nongmark`)뿐이고, 범위는 사용자가 고른다(모든 사용자 = HKLM·Program Files, 관리자 승인 1회 / 현재 사용자 = HKCU·LOCALAPPDATA). 전부 `app/install_windows.go`에 있다. 시스템 DLL은 System32 전체 경로로만.
 - **CSP**: 스크립트는 해시가 맞는 두 덩이(편집기 묶음, 화면 코드)만 돈다. 스타일은 `'unsafe-inline'`을 허용한다 - 편집기가 글자색·표 너비·손잡이 위치를 style 속성으로 그리기 때문인데,
   스타일은 코드를 실행하지 못하고 연결(connect/img/font-src)이 모두 막혀 있어 새어 나갈 길이 없다.
 - **독립 검토**: 1차(09-말) 지적 정션 탈출·느려짐(ReDoS)·백슬래시 링크 우회·장치 이름 누락, 2차(10-03, 편집기 교체 뒤) 지적 이동 미차단·바인딩 전 문서 주입·
