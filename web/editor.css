@@ -36,9 +36,9 @@
 .nm-grid { display: grid; grid-template-columns: repeat(var(--cols, 2), 210mm); gap: 24px; justify-content: center; }
 .nm-slot { position: relative; width: 210mm; height: 297mm; overflow: hidden; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); cursor: text; }
 .nm-slot.live { border-color: var(--leaf); }
-.nm-slot > .nm-sheet, .nm-slot > .nm-sheet-clone { position: absolute; left: 0; top: 0; width: 210mm; border: 0; box-shadow: none; will-change: transform; }
-.nm-sheet-clone { pointer-events: none; user-select: none; }
-.nm-sheet-clone .nm-pagegap-desk { visibility: hidden; }
+.nm-slot > .nm-sheet { position: absolute; left: 0; top: 0; width: 210mm; border: 0; box-shadow: none; will-change: transform; }
+.nm-sheet-clone { position: absolute; left: 0; top: 0; width: 210mm; height: 297mm; pointer-events: none; user-select: none; font-size: 11pt; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; color: var(--ink); }
+.nm-sheet-clone > * { box-sizing: border-box; }
 
 /* 콜아웃 */
 .nm-callout { display: flex; gap: 12px; border-radius: 8px; padding: 10px 14px; margin: 8px 0; background: var(--note); border-left: 4px solid #3b82a6; }

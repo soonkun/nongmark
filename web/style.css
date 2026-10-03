@@ -84,14 +84,15 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .hamburger { display: inline-flex; flex-direction: column; justify-content: center; gap: 3px; width: 32px; height: 30px; padding: 0 8px; }
 .hamburger span { display: block; height: 2px; border-radius: 1px; background: var(--muted); }
 .hamburger:hover span, .hamburger.on span { background: var(--green); }
-.body { display: grid; grid-template-columns: 48px 1fr; min-height: 0; transition: grid-template-columns .2s ease; }
+.body { display: grid; grid-template-columns: 58px 1fr; min-height: 0; transition: grid-template-columns .2s ease; }
 .app.rail-open .body { grid-template-columns: 184px 1fr; }
 /* 왼쪽 도구 막대: 접으면 아이콘만, 펴면 이름도. 설명 상자(.pop)는 오른쪽으로 펼쳐진다 */
-.rail { background: var(--cream); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 0; padding: 6px 5px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.rail { background: var(--cream); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 0; padding: 6px 8px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; } /* 막대는 휠로 넘기고 스크롤 막대는 숨긴다(도구가 가려지지 않게) */
+.rail::-webkit-scrollbar { display: none; }
 .rail.off { opacity: .35; pointer-events: none; }
 .rail hr { border: 0; border-top: 1px solid var(--wood); margin: 3px 6px; flex: none; }
 .rb-wrap { position: relative; }
-.rb { display: flex; align-items: center; gap: 10px; width: 100%; flex: none; border: 1px solid transparent; border-radius: 7px; padding: 4px 6px; background: none; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; text-align: left; }
+.rb { display: flex; align-items: center; gap: 10px; width: 100%; flex: none; border: 1px solid transparent; border-radius: 7px; padding: 4px 9px; background: none; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; text-align: left; }
 .rb:hover { background: var(--hover); }
 .rb:disabled { opacity: .35; cursor: default; } .rb:disabled:hover { background: none; }
 .rb.on { background: var(--green-soft); border-color: var(--leaf); color: var(--green-d); }

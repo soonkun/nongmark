@@ -153,14 +153,18 @@ const MM = 96 / 25.4;
 export const PAGE = { contentH: Math.round(237 * MM), top: Math.round(30 * MM), bottom: Math.round(30 * MM), gap: 24, sideL: Math.round(20 * MM) };
 const pagesKey = new PluginKey("nm-pages");
 
+/** 경계 위젯의 높이를 정한다(남은 쪽 공간 + 아래 여백 + 책상 틈 + 위 여백). 나중에 실제 위치에 맞춰 다시 정한다(setGapHeight). */
+function setGapHeight(dom, total) {
+  dom.style.height = total + "px";
+  dom.firstChild.style.height = Math.max(0, total - PAGE.gap - PAGE.top) + "px";
+}
+
 function gapWidget(remaining, pageNo) {
   const dom = document.createElement("div");
   dom.className = "nm-pagegap";
   dom.contentEditable = "false";
-  dom.style.height = remaining + PAGE.bottom + PAGE.gap + PAGE.top + "px";
   const fill = document.createElement("div");
   fill.className = "nm-pagegap-fill";
-  fill.style.height = remaining + PAGE.bottom + "px";
   const no = document.createElement("div");
   no.className = "nm-pagegap-no";
   no.textContent = `- ${pageNo} -`;
@@ -172,7 +176,29 @@ function gapWidget(remaining, pageNo) {
   top.className = "nm-pagegap-top";
   top.style.height = PAGE.top + "px";
   dom.append(fill, desk, top);
+  setGapHeight(dom, remaining + PAGE.bottom + PAGE.gap + PAGE.top);
   return dom;
+}
+
+export const PERIOD = PAGE.top + PAGE.contentH + PAGE.bottom + PAGE.gap; // 흐름에서 쪽 하나가 차지하는 높이(297mm + 책상 틈)
+
+/** 경계 위젯들을 실제 위치에 맞춘다: 쪽 k의 첫 블록이 정확히 k×PERIOD + 위 여백에서 시작하게.
+ * 잰 높이(offsetHeight+여백)와 실제 배치(여백 겹침)가 달라 쪽마다 몇 px씩 어긋나던 것이 쌓이지 않게 한다 - 격자 보기는 이 자리를 믿는다. */
+function alignGaps(view) {
+  const sheet = view.dom.closest(".nm-sheet");
+  if (!sheet) return 0;
+  const gaps = [...view.dom.querySelectorAll(":scope > .nm-pagegap")];
+  gaps.forEach((g, i) => {
+    const want = (i + 1) * PERIOD + PAGE.top; // 다음 쪽 첫 블록이 와야 할 자리(sheet 기준)
+    const top = g.offsetTop; // 여기까지 앞 쪽 내용이 끝났다
+    setGapHeight(g, Math.max(PAGE.gap + PAGE.top, want - top));
+  });
+  // 마지막 쪽도 꼭 한 장 높이가 되게
+  const used = view.dom.offsetTop + view.dom.offsetHeight; // 흐름 끝(sheet 기준)
+  const pages = gaps.length + 1;
+  const pad = pages * PERIOD - PAGE.gap - used;
+  sheet.style.paddingBottom = sheet.classList.contains("flow") ? "" : Math.max(0, pad) + "px";
+  return pages;
 }
 
 /** 쪽 경계 플러그인. 문서가 바뀌면 다음 프레임에 맨 바깥 블록들의 높이를 재어 경계 위치를 다시 정한다. */
@@ -230,12 +256,12 @@ export const Pages = Extension.create({
         y += h;
       });
       const sig = breaks.map((b) => b.join(":")).join(","); // 마지막 쪽의 남은 높이는 패딩으로만 바뀌니 트랜잭션을 만들지 않는다
-      const sheet = view.dom.closest(".nm-sheet");
-      if (sheet) sheet.style.paddingBottom = sheet.classList.contains("two") ? "" : Math.max(0, PAGE.contentH - y) + PAGE.bottom + "px"; // 마지막 쪽도 A4 한 장을 채운다(두 쪽 보기는 높이 고정)
+      if (sig !== lastSig) {
+        lastSig = sig;
+        view.dispatch(view.state.tr.setMeta(pagesKey, breaks));
+      }
+      alignGaps(view); // 위젯이 그려진 뒤(dispatch는 동기) 실제 위치로 맞춘다
       if (ext.options.onPages) ext.options.onPages(page);
-      if (sig === lastSig) return;
-      lastSig = sig;
-      view.dispatch(view.state.tr.setMeta(pagesKey, breaks));
     };
     const marginCache = new Map();
     // 글자를 치는 동안 매 프레임 재지 않고 손이 멈춘 뒤(120ms) 한 번 잰다 - 쪽 경계는 그 사이 조금 늦게 따라와도 된다

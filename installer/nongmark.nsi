@@ -7,7 +7,7 @@ Unicode true
 !define APP_NAME "새싹이의 농막"
 !define APP_ID "Nongmark"
 !define APP_EXE "nongmark.exe"
-!define APP_VERSION "1.0.1"
+!define APP_VERSION "1.0.2"
 !define PUBLISHER "농촌진흥청"
 !define PROG_ID "Nongmark.Markdown"
 !define REG_UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}"

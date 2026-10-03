@@ -131,7 +131,11 @@ with sync_playwright() as p:
     lefts = page.evaluate("[...document.querySelectorAll('.nm-desk:not([hidden]) .nm-slot')].slice(0,4).map(s => Math.round(s.getBoundingClientRect().left))")
     print("1~4쪽 위치 top:", tops, "left:", lefts)
     assert tops[0] == tops[1] and tops[2] == tops[3] and tops[2] > tops[0] and lefts[0] < lefts[1], "1·2쪽 한 줄, 그 아래 3·4쪽"
-    assert page.locator(".nm-desk:not([hidden]) .nm-slot.live .nm-sheet").count() == 1 and page.locator(".nm-desk:not([hidden]) .nm-sheet-clone").count() == n - 1
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot.live .nm-sheet").count() == 1 and page.locator(".nm-desk:not([hidden]) .nm-sheet-clone").count() >= 1  # 화면 밖 창은 비워 둔다
+    # 쪽 자리가 정확히 k×(297mm+24px)에 맞는지(여백 겹침으로 쪽마다 어긋나던 것)
+    drift = page.evaluate("""() => { const pm = document.querySelector('.nm-desk:not([hidden]) .nm-pm'); const P = 1122.52 + 24, TOP = 113.39; const out = [];
+      [...pm.querySelectorAll(':scope > .nm-pagegap')].forEach((g, i) => { let n = g.nextElementSibling; if (n) out.push(Math.round(n.offsetTop - ((i + 1) * P + TOP))); }); return out; }""")
+    print("쪽 자리 오차(px):", drift); assert all(0 <= d <= 24 for d in drift), "쪽 자리가 어긋남(누적되면 안 된다)"
     # 1쪽에서 편집 → 저장 글에 반영, 복제본에도 곧 반영
     page.click(".nm-desk:not([hidden]) .nm-slot.live .nm-pm h1"); page.keyboard.press("End"); page.keyboard.type(" 편집"); time.sleep(0.5)
     assert "편집" in page.inner_text(".nm-desk:not([hidden]) .nm-slot.live .nm-pm h1"), "격자 보기에서도 편집"

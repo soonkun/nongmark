@@ -13,7 +13,7 @@ import DragHandle from "@tiptap/extension-drag-handle";
 import Suggestion from "@tiptap/suggestion";
 import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
-import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages, TableResize } from "./nodes.js";
+import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages, TableResize, PERIOD } from "./nodes.js";
 import { docFromMd, mdFromDoc } from "./convert.js";
 import MD from "../../markdown.js";
 
@@ -218,27 +218,46 @@ function create(container, opts = {}) {
 
   /* 격자(쪽 나란히) 보기. 문서 흐름(.nm-sheet)은 하나이고 쪽마다 창(.nm-slot)을 둔다. 커서가 있는 쪽의 창에는 진짜 편집기를(쪽 위치만큼 위로 밀어서),
      나머지 창에는 복제본을 보여 준다. 쪽 경계 위젯 덕에 흐름에서 쪽 k는 정확히 k×(297mm+24px) 위치에서 시작한다. 1·2쪽, 그 아래 3·4쪽… 편집은 그대로. */
-  const MMPX = 96 / 25.4, PERIOD = 297 * MMPX + 24; // 쪽 한 장 + 책상 틈
-  const grid = { on: false, cols: 2, live: 0, slots: [], box: null, timer: 0 };
-  const zoomOf = () => (sheet.offsetWidth ? sheet.getBoundingClientRect().width / sheet.offsetWidth : 1) || 1; // 조상의 CSS zoom까지 합친 실제 배율
-  const cleanClone = () => {
-    const c = sheet.cloneNode(true);
-    c.classList.add("nm-sheet-clone");
-    c.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
-    c.querySelectorAll(".nm-handle, .nm-tablebox, [data-resize-handle], .column-resize-handle, .ProseMirror-selectednode, .selectedCell").forEach((e) => e.classList.contains("ProseMirror-selectednode") || e.classList.contains("selectedCell") ? e.classList.remove("ProseMirror-selectednode", "selectedCell") : e.remove());
-    c.style.paddingBottom = sheet.style.paddingBottom;
-    return c;
-  };
+  const PAGE_H = Math.round(297 * 96 / 25.4);
+  const grid = { on: false, cols: 2, live: 0, slots: [], box: null, timer: 0, dirty: new Set(), io: null };
   const shift = (elm, k) => { elm.style.transform = `translateY(${-k * PERIOD}px)`; };
-  function refreshClones() {
+  /** 쪽 k의 복제본: 그 쪽에 걸린 블록만 떠서(문서 전체가 아니라) 제자리에 놓는다. 쪽 수가 많아도 한 쪽 채우는 값은 그 쪽 분량뿐. */
+  function pageClone(k) {
+    const c = el("div", "nm-sheet-clone nm-pm"); // .nm-pm 스타일(제목·표…)이 그대로 먹게
+    const y0 = k * PERIOD, y1 = y0 + PAGE_H;
+    for (const b of editor.view.dom.children) {
+      if (b.classList.contains("nm-pagegap")) continue;
+      const top = b.offsetTop, bottom = top + b.offsetHeight;
+      if (bottom <= y0 || top >= y1) continue;
+      const d = b.cloneNode(true);
+      d.removeAttribute("contenteditable");
+      d.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
+      d.querySelectorAll(".nm-handle, .nm-tablebox, [data-resize-handle], .column-resize-handle").forEach((e) => e.remove());
+      d.classList.remove("ProseMirror-selectednode");
+      d.querySelectorAll(".ProseMirror-selectednode, .selectedCell").forEach((e) => e.classList.remove("ProseMirror-selectednode", "selectedCell"));
+      d.style.position = "absolute";
+      d.style.left = b.offsetLeft + "px";
+      d.style.top = top - y0 + "px";
+      d.style.width = b.offsetWidth + "px";
+      d.style.margin = "0";
+      c.append(d);
+    }
+    const no = el("div", "nm-pagegap-no", `- ${k + 1} -`);
+    c.append(no);
+    return c;
+  }
+  const slotVisible = (slot) => { const r = slot.getBoundingClientRect(); return r.bottom > -r.height && r.top < window.innerHeight + r.height; };
+  function fillSlot(k) {
+    const slot = grid.slots[k];
+    if (!slot || k === grid.live) return;
+    slot.replaceChildren(pageClone(k));
+    grid.dirty.delete(k);
+  }
+  /** 보이는 창만 채운다(화면 밖은 비워 두었다가 스크롤로 들어올 때). 글이 바뀌면 전부 더럽히고 보이는 것만 다시. */
+  function refreshClones(all = true) {
     if (!grid.on) return;
-    const base = cleanClone();
-    grid.slots.forEach((slot, k) => {
-      if (k === grid.live) return;
-      const c = base.cloneNode(true);
-      shift(c, k);
-      slot.replaceChildren(c);
-    });
+    if (all) grid.slots.forEach((_, k) => k !== grid.live && grid.dirty.add(k));
+    for (const k of [...grid.dirty]) if (slotVisible(grid.slots[k])) fillSlot(k);
   }
   function layoutGrid() {
     if (!grid.on) return;
@@ -256,8 +275,10 @@ function create(container, opts = {}) {
       });
       grid.slots.push(slot);
       grid.box.append(slot);
+      grid.dirty.add(k);
+      if (grid.io) grid.io.observe(slot);
     }
-    while (grid.slots.length > pageCount) grid.slots.pop().remove();
+    while (grid.slots.length > pageCount) { const s = grid.slots.pop(); if (grid.io) grid.io.unobserve(s); s.remove(); }
     if (grid.live >= pageCount) moveLive(pageCount - 1);
     if (!grid.slots[grid.live].contains(sheet)) { grid.slots[grid.live].replaceChildren(sheet); shift(sheet, grid.live); }
     grid.slots.forEach((s, k) => s.classList.toggle("live", k === grid.live));
@@ -265,11 +286,12 @@ function create(container, opts = {}) {
   }
   function moveLive(k) {
     if (!grid.on || k === grid.live || k < 0 || k >= grid.slots.length) return;
-    const old = grid.slots[grid.live];
+    const oldK = grid.live;
     grid.live = k;
     grid.slots[k].replaceChildren(sheet);
     shift(sheet, k);
-    const c = cleanClone(); shift(c, grid.slots.indexOf(old)); old.replaceChildren(c);
+    grid.dirty.add(oldK);
+    fillSlot(oldK);
     grid.slots.forEach((s, i) => s.classList.toggle("live", i === k));
     grid.slots[k].scrollIntoView({ block: "nearest" });
   }
@@ -294,12 +316,14 @@ function create(container, opts = {}) {
       grid.on = false;
       sheet.style.transform = "";
       container.insertBefore(sheet, container.firstChild);
-      grid.box.remove(); grid.box = null; grid.slots = [];
+      grid.box.remove(); grid.box = null; grid.slots = []; grid.dirty.clear();
+      if (grid.io) { grid.io.disconnect(); grid.io = null; }
       container.classList.remove("grid");
       return;
     }
     grid.on = true; grid.cols = cols;
     if (!grid.box) { grid.box = el("div", "nm-grid"); container.insertBefore(grid.box, container.firstChild); }
+    if (!grid.io) grid.io = new IntersectionObserver((entries) => { for (const en of entries) { const k = grid.slots.indexOf(en.target); if (en.isIntersecting && grid.dirty.has(k)) fillSlot(k); } }, { rootMargin: "300px" });
     container.classList.add("grid");
     layoutGrid();
   }
