@@ -15,6 +15,7 @@ import (
 )
 
 type Chromium struct {
+	pageSource            string // 농막: 우리 화면(SetHtml)이 다 뜬 뒤 런타임이 보고한 주소(about:blank 또는 data:…) - 이후 이동·메시지 판정의 기준
 	hwnd                  uintptr
 	focusOnInit           bool
 	controller            *ICoreWebView2Controller
@@ -245,15 +246,22 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 	return 0
 }
 
-// isOurPage: 우리가 SetHtml(NavigateToString)로 넣는 화면인가. 런타임 판에 따라 about:blank 또는 data: 주소로 보고된다.
-func isOurPage(uri string) bool {
-	return uri == "" || uri == "about:blank" || strings.HasPrefix(uri, "about:") || strings.HasPrefix(uri, "data:")
+// isOurPage: 우리가 SetHtml(NavigateToString)로 넣는 화면인가. 런타임 판에 따라 about:blank 또는 data:text/html 주소로 보고된다.
+// 화면이 한 번 다 뜨고 나면(pageSource 기록) 그 주소와 about:blank만 인정한다 - 이후에는 어떤 data:·about: 주소로도 못 간다.
+func (e *Chromium) isOurPage(uri string) bool {
+	if uri == "" || uri == "about:blank" {
+		return true
+	}
+	if e.pageSource != "" {
+		return uri == e.pageSource
+	}
+	return strings.HasPrefix(uri, "data:text/html") // 첫 화면이 뜨기 전, SetHtml 자신의 이동
 }
 
 // NavigationStarting: 우리 화면 말고 다른 곳(http·https·file·ftp…)으로 가는 이동은 취소한다 - 문서 안 링크 클릭·드롭한 파일 등.
 func (e *Chromium) NavigationStarting(sender *ICoreWebView2, args *ICoreWebView2NavigationStartingEventArgs) uintptr {
 	uri, _ := args.GetUri()
-	if !isOurPage(uri) {
+	if !e.isOurPage(uri) {
 		_ = args.PutCancel(true)
 	}
 	return 0
@@ -272,7 +280,7 @@ func (e *Chromium) MessageReceived(sender *ICoreWebView2, args *iCoreWebView2Web
 	if source != nil {
 		src := w32.Utf16PtrToString(source)
 		windows.CoTaskMemFree(unsafe.Pointer(source))
-		if !isOurPage(src) {
+		if !e.isOurPage(src) {
 			return 0
 		}
 	}
@@ -382,6 +390,15 @@ func boolToInt(input bool) int {
 }
 
 func (e *Chromium) NavigationCompleted(sender *ICoreWebView2, args *ICoreWebView2NavigationCompletedEventArgs) uintptr {
+	// 농막: 우리 화면이 다 뜬 주소를 기록해 둔다(이후 이동·메시지는 이 주소만 인정)
+	if e.pageSource == "" {
+		var src *uint16
+		_, _, _ = sender.vtbl.GetSource.Call(uintptr(unsafe.Pointer(sender)), uintptr(unsafe.Pointer(&src)))
+		if src != nil {
+			e.pageSource = w32.Utf16PtrToString(src)
+			windows.CoTaskMemFree(unsafe.Pointer(src))
+		}
+	}
 	if e.NavigationCompletedCallback != nil {
 		e.NavigationCompletedCallback(sender, args)
 	}
