@@ -48,14 +48,23 @@
 .nm-sheet-no { position: absolute; left: 0; right: 0; bottom: 12mm; text-align: center; font-size: 9pt; color: var(--muted); pointer-events: none; }
 
 /* 표: 열 경계를 끌어 너비 조절(tiptap). 머리 줄은 연한 바탕. */
-.nm-pm .tableWrapper { overflow-x: auto; margin: 10px 0; }
-.nm-pm table { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: 14px; }
+.nm-pm .tableWrapper { overflow: visible; margin: 10px 0; } /* 스크롤 막대가 열 경계 끌기와 겹치지 않게 - 너비는 모서리 손잡이로 쪽 안에 맞춘다 */
+.nm-pm table { border-collapse: collapse; table-layout: fixed; width: 100%; max-width: 100%; font-size: 14px; }
 .nm-pm th, .nm-pm td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; position: relative; min-width: 1em; }
 .nm-pm th > p, .nm-pm td > p { margin: 0; min-height: 1.4em; }
 .nm-pm th { background: var(--cream); font-weight: 700; color: var(--green-d); }
 .nm-pm .selectedCell::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--leaf) 18%, transparent); pointer-events: none; }
 .nm-pm .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px; background: var(--leaf); pointer-events: none; }
 .nm-pm.resize-cursor { cursor: col-resize; }
+
+/* 표 전체 테두리와 네 모서리 손잡이(커서가 표 안에 있을 때). 손잡이만 마우스를 받는다 */
+.nm-tablebox { position: absolute; z-index: 3; border: 1.5px solid var(--leaf); border-radius: 3px; pointer-events: none; box-sizing: border-box; }
+.nm-tablebox-h { position: absolute; width: 12px; height: 12px; background: var(--paper); border: 2px solid var(--leaf); border-radius: 50%; pointer-events: auto; }
+.nm-tablebox-h[data-dir="top-left"] { left: -7px; top: -7px; cursor: nwse-resize; }
+.nm-tablebox-h[data-dir="bottom-right"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.nm-tablebox-h[data-dir="top-right"] { right: -7px; top: -7px; cursor: nesw-resize; }
+.nm-tablebox-h[data-dir="bottom-left"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
+body.nm-resizing { cursor: nwse-resize; user-select: none; }
 
 /* 그림: 크기 조절 손잡이(tiptap), 정렬 */
 .nm-pm img { max-width: 100%; height: auto; border-radius: 6px; display: block; }

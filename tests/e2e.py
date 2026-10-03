@@ -55,6 +55,13 @@ with sync_playwright() as p:
     assert not page.is_hidden("#f-tablebar"), "표 안이면 표 도구가 보인다"
     page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); time.sleep(1.2)
     assert "| 가 | 나 |  |" in files()["시작.md"], files()["시작.md"]
+    # 표 둘레 테두리의 모서리를 끌면 표 전체 너비가 바뀌고 열 너비가 파일에 남는다
+    assert not page.is_hidden(".nm-desk:not([hidden]) .nm-tablebox")
+    w0 = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-pm table').getBoundingClientRect().width")
+    hb = page.locator(".nm-desk:not([hidden]) .nm-tablebox-h[data-dir=bottom-right]").bounding_box()
+    page.mouse.move(hb["x"] + 6, hb["y"] + 6); page.mouse.down(); page.mouse.move(hb["x"] - 120, hb["y"] + 6, steps=6); page.mouse.up(); time.sleep(1.3)
+    w1 = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-pm table').getBoundingClientRect().width")
+    print("표 너비:", round(w0), "→", round(w1)); assert w1 < w0 - 80 and "<!-- cols:" in files()["시작.md"]
     page.click(".nm-pm a:has-text('바깥')", modifiers=["Control"]); time.sleep(0.3)  # 편집 중엔 Ctrl+클릭이 링크 열기
     assert "바깥 주소는 열지 않습니다" in page.inner_text("#status")
     page.click(".nm-pm a:has-text('회의록')", modifiers=["Control"]); page.wait_for_selector(".tab.on:has-text('1차')"); time.sleep(0.4)

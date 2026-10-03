@@ -13,7 +13,7 @@ import DragHandle from "@tiptap/extension-drag-handle";
 import Suggestion from "@tiptap/suggestion";
 import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
-import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages } from "./nodes.js";
+import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages, TableResize } from "./nodes.js";
 import { docFromMd, mdFromDoc } from "./convert.js";
 import MD from "../../markdown.js";
 
@@ -238,7 +238,7 @@ function create(container, opts = {}) {
       TaskList, TaskItem.configure({ nested: true }),
       TextStyleKit,
       NmImage.configure({ inline: false, allowBase64: false, resize: { enabled: true, minWidth: 40 }, resolve: (src) => imageCache.get(src) || (String(src || "").startsWith("data:") ? src : "") }),
-      Callout, PageBreak, MoveBlock,
+      Callout, PageBreak, MoveBlock, TableResize,
       Placeholder.configure({ placeholder: ({ node, editor: e }) => (e.state.doc.childCount === 1 && node.type.name === "paragraph" ? "여기를 눌러 쓰기 시작 · / 로 블록 넣기" : "") }),
       DragHandle.configure({
         render: () => { const h = el("div", "nm-handle"); h.title = "끌어서 옮기기 · Alt+↑↓"; h.textContent = "⋮⋮"; return h; },

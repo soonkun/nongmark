@@ -4,6 +4,7 @@ import { TableCell, TableHeader } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { Plugin, PluginKey, NodeSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { TableMap } from "@tiptap/pm/tables";
 
 export const CALLOUTS = { NOTE: "참고", TIP: "팁", IMPORTANT: "중요", WARNING: "주의", CAUTION: "경고" };
 
@@ -231,6 +232,135 @@ export const Pages = Extension.create({
           const ro = new ResizeObserver(() => schedule(view));
           ro.observe(view.dom);
           return { update: () => schedule(view), destroy: () => { ro.disconnect(); if (scheduled) cancelAnimationFrame(scheduled); } };
+        },
+      }),
+    ];
+  },
+});
+
+/* ---------------- 표 전체 크기 조절: 커서가 표 안에 있으면 표 둘레에 테두리와 네 모서리 손잡이 ---------------- */
+
+
+const tableResizeKey = new PluginKey("nm-table-resize");
+
+/** 선택이 든 표의 (pos, node). 없으면 null. */
+function tableAt(state) {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    const n = $from.node(d);
+    if (n.type.name === "table") return { pos: $from.before(d), node: n };
+  }
+  return null;
+}
+
+/** 표의 열 너비 목록(px). colwidth가 없는 열은 DOM에서 잰다. */
+function columnWidths(node, dom) {
+  const map = TableMap.get(node);
+  const widths = new Array(map.width).fill(0);
+  const firstRow = dom.querySelector("tr");
+  const cells = firstRow ? [...firstRow.children] : [];
+  let col = 0;
+  for (const cell of cells) {
+    const span = Number(cell.getAttribute("colspan") || 1);
+    const cw = (cell.getAttribute("colwidth") || "").split(",").map(Number).filter(Boolean);
+    for (let k = 0; k < span && col < map.width; k++, col++) widths[col] = cw[k] || Math.round(cell.offsetWidth / span);
+  }
+  return widths;
+}
+
+export const TableResize = Extension.create({
+  name: "tableResize",
+  addOptions() { return { maxWidth: 642, minCol: 40 }; },
+  addProseMirrorPlugins() {
+    const ext = this;
+    return [
+      new Plugin({
+        key: tableResizeKey,
+        view(view) {
+          const host = view.dom.parentElement; // .nm-sheet(position: relative)
+          const box = document.createElement("div");
+          box.className = "nm-tablebox";
+          box.hidden = true;
+          const handles = ["top-left", "top-right", "bottom-left", "bottom-right"].map((dir) => {
+            const h = document.createElement("div");
+            h.className = "nm-tablebox-h";
+            h.dataset.dir = dir;
+            h.title = "끌어서 표 너비 조절";
+            box.append(h);
+            return h;
+          });
+          host.append(box);
+          let current = null; // {pos, dom, table}
+          const zoom = () => Number(getComputedStyle(host.closest(".nm-desk") || host).zoom) || 1;
+
+          const place = () => {
+            const t = tableAt(view.state);
+            const dom = t && view.nodeDOM(t.pos);
+            const table = dom && dom.querySelector && dom.querySelector("table");
+            if (!t || !table || !view.hasFocus() && !box.contains(document.activeElement) && !dragging) { box.hidden = true; current = null; return; }
+            current = { pos: t.pos, node: t.node, dom, table };
+            const z = zoom();
+            const hr = host.getBoundingClientRect(), r = table.getBoundingClientRect();
+            box.style.left = (r.left - hr.left) / z + "px";
+            box.style.top = (r.top - hr.top) / z + "px";
+            box.style.width = r.width / z + "px";
+            box.style.height = r.height / z + "px";
+            box.hidden = false;
+          };
+
+          // 모서리 끌기: 가로 이동만 본다(표의 세로 크기는 내용이 정한다). 열 너비를 같은 비율로 늘이고 줄인다.
+          let dragging = null;
+          const onMove = (e) => {
+            if (!dragging) return;
+            const dx = (e.clientX - dragging.x) / zoom() * (dragging.dir.includes("left") ? -1 : 1);
+            const minTotal = dragging.widths.length * ext.options.minCol;
+            const total = Math.max(minTotal, Math.min(ext.options.maxWidth, dragging.total + dx));
+            dragging.scale = total / dragging.total;
+            const cols = dragging.table.querySelectorAll("colgroup col");
+            dragging.widths.forEach((w, k) => { if (cols[k]) cols[k].style.width = Math.round(w * dragging.scale) + "px"; });
+            dragging.table.style.width = Math.round(total) + "px";
+            place();
+          };
+          const onUp = () => {
+            if (!dragging) return;
+            const { node, pos, widths, scale } = dragging;
+            dragging = null;
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+            document.body.classList.remove("nm-resizing");
+            if (!scale || Math.abs(scale - 1) < 0.002) return;
+            const map = TableMap.get(node);
+            const tr = view.state.tr;
+            const seen = new Set();
+            for (let row = 0; row < map.height; row++) {
+              for (let col = 0; col < map.width; col++) {
+                const cellPos = map.map[row * map.width + col];
+                if (seen.has(cellPos)) continue;
+                seen.add(cellPos);
+                const cell = node.nodeAt(cellPos);
+                const span = cell.attrs.colspan || 1;
+                const cw = [];
+                for (let k = 0; k < span; k++) cw.push(Math.max(ext.options.minCol, Math.round(widths[col + k] * scale)));
+                tr.setNodeMarkup(pos + 1 + cellPos, undefined, { ...cell.attrs, colwidth: cw });
+              }
+            }
+            view.dispatch(tr);
+          };
+          for (const h of handles) {
+            h.addEventListener("pointerdown", (e) => {
+              if (!current) return;
+              e.preventDefault();
+              const widths = columnWidths(current.node, current.table);
+              dragging = { x: e.clientX, dir: h.dataset.dir, widths, total: widths.reduce((a, b) => a + b, 0), scale: 1, table: current.table, node: current.node, pos: current.pos };
+              document.body.classList.add("nm-resizing");
+              document.addEventListener("pointermove", onMove);
+              document.addEventListener("pointerup", onUp);
+            });
+          }
+          const ro = new ResizeObserver(() => place());
+          ro.observe(view.dom);
+          view.dom.addEventListener("blur", () => setTimeout(place, 100));
+          return { update: place, destroy: () => { ro.disconnect(); box.remove(); } };
         },
       }),
     ];
