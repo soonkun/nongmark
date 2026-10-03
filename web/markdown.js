@@ -29,8 +29,48 @@ function safeImage(src) {
 }
 
 // 코드 표시는 백틱 1~3개·내용 2000자로 묶는다 - 묶지 않으면 닫히지 않은 긴 백틱 줄에서 세제곱 시간(ReDoS, 실측 2천 자에 0.7초).
+// 뒤쪽 넷은 편집기가 쓰는 글자 꾸밈: \* 같은 역슬래시 이스케이프, <span style="색·바탕·글꼴·크기">, <u>, <br>.
+// 마크다운에 없는 글자색·글꼴은 이 꼴의 인라인 HTML로 적는다(Obsidian·Typora도 같은 꼴을 읽는다). 그 밖의 HTML은 여전히 글자로만 보인다.
 const INLINE =
-  /(`{1,3})([^`][\s\S]{0,2000}?)\1(?!`)|!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|\[([^\]]+)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|\*\*(?=\S)([\s\S]*?\S)\*\*|__(?=\S)([\s\S]*?\S)__|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<![\w/])_(?=[^\s_])([^_]*?[^\s_])_(?![\w])|(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/g;
+  /(`{1,3})([^`][\s\S]{0,2000}?)\1(?!`)|!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|\[([^\]]+)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|\*\*(?=\S)([\s\S]*?\S)\*\*|__(?=\S)([\s\S]*?\S)__|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<![\w/])_(?=[^\s_])([^_]*?[^\s_])_(?![\w])|(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])|\\([\\`*_~\[\]<>|#+\-.!(){}])|<span style="([^"<>]{1,200})">([\s\S]{0,5000}?)<\/span>|<u>([\s\S]{0,5000}?)<\/u>|<br\s*\/?>/g;
+
+/** style="…" 속성 검사: color·background-color·font-family·font-size만, 값도 꼴이 맞는 것만 남긴다. 아무것도 없으면 null.
+ * 결과는 이 파일이 다시 조립해 넣는다 - 원문 문자열이 그대로 HTML 속성에 들어가는 일은 없다. */
+function parseStyle(str) {
+  const color = (v) => {
+    const t = v.trim().toLowerCase();
+    let m = t.match(/^#([0-9a-f]{6})$/);
+    if (m) return "#" + m[1];
+    m = t.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+    if (m) return "#" + m[1] + m[1] + m[2] + m[2] + m[3] + m[3];
+    m = t.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/);
+    if (m) return "#" + [m[1], m[2], m[3]].map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join("");
+    return null;
+  };
+  const out = {};
+  for (const part of String(str).split(";")) {
+    const i = part.indexOf(":");
+    if (i < 0) continue;
+    const name = part.slice(0, i).trim().toLowerCase();
+    const value = part.slice(i + 1).trim();
+    if (name === "color") { const c = color(value); if (c) out.color = c; }
+    else if (name === "background-color" || name === "background") { const c = color(value); if (c) out.bg = c; }
+    else if (name === "font-family") {
+      const f = value.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
+      if (/^[\w\s가-힣\-]{1,40}$/.test(f)) out.font = f;
+    } else if (name === "font-size") {
+      const m = value.match(/^(\d{1,2}(?:\.\d)?)\s*(pt|px)$/i);
+      if (m) { const pt = Math.round((m[2].toLowerCase() === "px" ? Number(m[1]) * 0.75 : Number(m[1])) * 2) / 2; if (pt >= 6 && pt <= 72) out.size = pt + "pt"; }
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** 검사를 거친 꾸밈 → <span class="st" data-…>. 실제 색은 화면 쪽이 CSSOM으로 입힌다(CSP가 style 속성을 막는다). */
+function styleSpan(st, inner) {
+  const attrs = Object.entries({ color: st.color, bg: st.bg, font: st.font, size: st.size }).filter(([, v]) => v).map(([k, v]) => ` data-${k}="${esc(v)}"`).join("");
+  return `<span class="st"${attrs}>${inner}</span>`;
+}
 
 /** 한 줄(또는 단락) 안의 꾸밈. */
 const MAX_INLINE = 10000; // 이보다 긴 한 줄은 꾸밈 없이 글자로만 - 링크 패턴이 긴 줄에서 제곱 시간(독립 검토, 10만 자 4초)
@@ -62,13 +102,19 @@ function inline(src, depth = 0) {
     else if (m[10] !== undefined) out += `<em>${inline(m[10], depth + 1)}</em>`;
     else if (m[11] !== undefined) out += `<em>${inline(m[11], depth + 1)}</em>`;
     else if (m[12] !== undefined) out += `<a href="${esc(m[12])}" data-href="${esc(m[12])}">${esc(m[12])}</a>`;
+    else if (m[13] !== undefined) out += esc(m[13]);
+    else if (m[14] !== undefined) {
+      const st = parseStyle(m[14]);
+      out += st ? styleSpan(st, inline(m[15], depth + 1)) : inline(m[15], depth + 1);
+    } else if (m[16] !== undefined) out += `<u>${inline(m[16], depth + 1)}</u>`;
+    else out += "<br>";
     if (m[0].length === 0) re.lastIndex++;
   }
   return out + esc(src.slice(last));
 }
 
 /** 한 줄 안의 꾸밈을 HTML이 아니라 조각 목록으로 - 한글(hwpx) 내보내기가 쓴다.
- * 조각: {text, b, i, s, code, link, image:{alt, src}}. 규칙은 inline()과 같다(같은 정규식). */
+ * 조각: {text, b, i, s, u, code, link, color, bg, font, size, image:{alt, src}}. 규칙은 inline()과 같다(같은 정규식). <br>은 "\n". */
 function inlineRuns(src, style = {}, depth = 0) {
   const out = [];
   const push = (text, extra = {}) => text && out.push({ ...style, ...extra, text });
@@ -92,6 +138,10 @@ function inlineRuns(src, style = {}, depth = 0) {
     else if (m[9] !== undefined) out.push(...inlineRuns(m[9], { ...style, s: true }, depth + 1));
     else if (m[10] !== undefined || m[11] !== undefined) out.push(...inlineRuns(m[10] ?? m[11], { ...style, i: true }, depth + 1));
     else if (m[12] !== undefined) push(m[12], { link: m[12] });
+    else if (m[13] !== undefined) push(m[13]);
+    else if (m[14] !== undefined) out.push(...inlineRuns(m[15], { ...style, ...(parseStyle(m[14]) || {}) }, depth + 1));
+    else if (m[16] !== undefined) out.push(...inlineRuns(m[16], { ...style, u: true }, depth + 1));
+    else push("\n");
     if (m[0].length === 0) re.lastIndex++;
   }
   push(src.slice(last));
@@ -250,4 +300,4 @@ function titleOf(text) {
   return (m ? m[1] : String(text).split("\n").find((l) => l.trim()) || "").trim().slice(0, 80);
 }
 
-if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, inlineRuns, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf, headingText, RE };
+if (typeof module !== "undefined") module.exports = { esc, safeUrl, safeImage, inline, inlineRuns, parseStyle, splitBlocks, renderBlock, renderDoc, toggleTask, titleOf, headingText, RE };

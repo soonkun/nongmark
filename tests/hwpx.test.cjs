@@ -10,6 +10,7 @@ const template = { header: read("header.xml"), section: read("section0.xml"), ve
 const sample = `# 2026년 스마트농업 추진 계획
 
 농촌진흥청은 **스마트농업** 확산을 위해 *세 가지* 과제를 추진한다. 자세한 것은 [별첨](별첨.md) 참고.
+<span style="color:#c00000">빨간 글</span> <span style="background-color:#ffff00">형광펜</span> <span style="font-family:궁서;font-size:14pt">궁서 14pt</span> <u>밑줄</u>
 
 ## 1. 추진 과제
 

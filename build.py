@@ -65,14 +65,16 @@ def build_html() -> Path:
     markdown = (WEB / "markdown.js").read_text(encoding="utf-8")
     app = (WEB / "app.js").read_text(encoding="utf-8")
     hwpx = (WEB / "hwpx.js").read_text(encoding="utf-8")
+    editor = (WEB / "editor.js").read_text(encoding="utf-8")
     T = ASSETS / "hwpx-template"
     template = {k: (T / f).read_text(encoding="utf-8") for k, f in [("header", "header.xml"), ("section", "section0.xml"), ("version", "version.xml"),
                 ("settings", "settings.xml"), ("container", "container.xml"), ("containerRdf", "container.rdf"), ("manifest", "manifest.xml")]}
     # markdown.js를 함수 안에 가둬 전역에는 MD 하나만 남긴다
     script = "\nconst MD = (() => {\n" + markdown.replace("if (typeof module", "// node 시험용 내보내기\n  if (false && typeof module") + \
-        "\nreturn { splitBlocks, renderBlock, toggleTask, titleOf, inlineRuns, safeImage, headingText, RE };\n})();\n" + \
+        "\nreturn { splitBlocks, renderBlock, toggleTask, titleOf, inlineRuns, parseStyle, safeImage, headingText, RE };\n})();\n" + \
         "const MDX = MD;\nconst MD_SAFE_IMAGE = MD.safeImage;\nconst HWPX_TEMPLATE = " + json.dumps(template, ensure_ascii=False).replace("</", "<\\/") + ";\n" + \
-        hwpx.replace("if (typeof module", "if (false && typeof module") + "\n" + app + "\n"
+        hwpx.replace("if (typeof module", "if (false && typeof module") + "\n" + \
+        editor.replace("if (typeof module", "if (false && typeof module") + "\n" + app + "\n"
     check(script)
     style = "\n" + (WEB / "style.css").read_text(encoding="utf-8")
     csp = "; ".join([

@@ -28,15 +28,23 @@ const HWPX = (() => {
     let nextBorder = count("borderFills") + 1; // borderFill id는 1부터
     const out = { char: [], para: [], border: [] };
 
-    function charPr({ size = 1100, b = false, i = false, s = false, u = false, color = "#000000", font = FONT_BODY } = {}) {
-      const key = [size, b, i, s, u, color, font].join("|");
+    // 글꼴: 기본 둘(맑은 고딕·굴림체) 외에 문서가 쓴 글꼴 이름은 쓰일 때 번호를 받는다(머리에 fontface로 덧붙임)
+    const fonts = new Map([["맑은 고딕", FONT_BODY], ["굴림체", FONT_CODE]]);
+    let nextFont = FONT_CODE + 1;
+    function font(name) {
+      if (!fonts.has(name)) fonts.set(name, nextFont++);
+      return fonts.get(name);
+    }
+
+    function charPr({ size = 1100, b = false, i = false, s = false, u = false, color = "#000000", bg = "none", font = FONT_BODY } = {}) {
+      const key = [size, b, i, s, u, color, bg, font].join("|");
       if (!char.has(key)) {
         const id = nextChar++;
         char.set(key, id);
         const f = `hangul="${font}" latin="${font}" hanja="${font}" japanese="${font}" other="${font}" symbol="${font}" user="${font}"`;
         const all = (v) => `hangul="${v}" latin="${v}" hanja="${v}" japanese="${v}" other="${v}" symbol="${v}" user="${v}"`;
         out.char.push(
-          `<hh:charPr id="${id}" height="${size}" textColor="${color}" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="2">` +
+          `<hh:charPr id="${id}" height="${size}" textColor="${color}" shadeColor="${bg}" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="2">` +
             `<hh:fontRef ${f}/><hh:ratio ${all(100)}/><hh:spacing ${all(0)}/><hh:relSz ${all(100)}/><hh:offset ${all(0)}/>` +
             (i ? "<hh:italic/>" : "") + (b ? "<hh:bold/>" : "") +
             `<hh:underline type="${u ? "BOTTOM" : "NONE"}" shape="SOLID" color="${color}"/>` +
@@ -84,11 +92,11 @@ const HWPX = (() => {
     }
 
     function apply(h) {
-      // 글꼴 둘(맑은 고딕, 굴림체)을 모든 언어 묶음에 더한다
+      // 쓰인 글꼴(맑은 고딕, 굴림체 + 문서가 고른 것)을 모든 언어 묶음에 더한다
+      const faces = [...fonts].map(([name, id]) =>
+        `<hh:font id="${id}" face="${xml(name)}" type="TTF" isEmbedded="0"><hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="${id === FONT_CODE ? 9 : 4}" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/></hh:font>`).join("");
       h = h.replace(/<hh:fontface lang="([A-Z]+)" fontCnt="(\d+)">([\s\S]*?)<\/hh:fontface>/g, (_, lang, n, body) =>
-        `<hh:fontface lang="${lang}" fontCnt="${Number(n) + 2}">${body}` +
-        `<hh:font id="${FONT_BODY}" face="맑은 고딕" type="TTF" isEmbedded="0"><hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/></hh:font>` +
-        `<hh:font id="${FONT_CODE}" face="굴림체" type="TTF" isEmbedded="0"><hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="9" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/></hh:font></hh:fontface>`);
+        `<hh:fontface lang="${lang}" fontCnt="${Number(n) + fonts.size}">${body}${faces}</hh:fontface>`);
       const add = (tag, items) => {
         h = h.replace(new RegExp(`<hh:${tag} itemCnt="(\\d+)">`), (_, n) => `<hh:${tag} itemCnt="${Number(n) + items.length}">`);
         h = h.replace(`</hh:${tag}>`, items.join("") + `</hh:${tag}>`);
@@ -98,7 +106,7 @@ const HWPX = (() => {
       add("paraProperties", out.para);
       return h;
     }
-    return { charPr, paraPr, borderFill, apply };
+    return { charPr, paraPr, borderFill, font, apply };
   }
 
   /* ---- 그림 크기 읽기(png·jpg·gif·webp 머리) ---- */
@@ -151,6 +159,11 @@ const HWPX = (() => {
         if (r.code) look.font = FONT_CODE;
         if (r.code) look.color = "#B4472D";
         if (r.link) { look.u = true; look.color = GREEN; }
+        if (r.u) look.u = true;
+        if (r.color) look.color = r.color.toUpperCase();
+        if (r.bg) look.bg = r.bg.toUpperCase();
+        if (r.font) look.font = st.font(r.font);
+        if (r.size) look.size = Math.round(parseFloat(r.size) * 100);
         return run(r.text, st.charPr(look));
       }).join("") || run("", st.charPr(base));
     const imagesIn = (src) => MDX.inlineRuns(src).filter((r) => r.image).map((r) => r.image);

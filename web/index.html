@@ -58,10 +58,43 @@
         </div>
       </div>
       <div class="title"><span id="crumb" class="crumb"></span><span id="pagename" class="pagename"></span></div>
-      <button id="btn-raw" class="icon-btn" title="문서 전체를 마크다운 원문으로 보기·고치기">원문</button>
+      <span class="mode" role="group" aria-label="편집 모드"><button id="mode-rich" class="on" title="서식 도구로 고치기(노션처럼)">편집기</button><button id="mode-raw" title="문서 전체를 마크다운 원문으로 보기·고치기">원문</button></span>
       <button id="btn-rename" class="icon-btn" title="이름 바꾸기">이름 바꾸기</button>
       <button id="btn-delete" class="icon-btn" title="이 문서 지우기">지우기</button>
       <button id="btn-theme" class="icon-btn" title="밝게 / 어둡게">어둡게</button>
+    </div>
+    <div id="fmt" class="fmt">
+      <select id="f-block" title="블록 종류">
+        <option value="p">본문</option><option value="h1">제목 1</option><option value="h2">제목 2</option><option value="h3">제목 3</option>
+        <option value="blockquote">인용</option><option value="code">코드</option>
+      </select>
+      <span class="fmt-sep"></span>
+      <button data-cmd="bold" title="굵게 (Ctrl+B)"><b>가</b></button>
+      <button data-cmd="italic" title="기울임 (Ctrl+I)"><i>가</i></button>
+      <button data-cmd="underline" title="밑줄 (Ctrl+U)"><u>가</u></button>
+      <button data-cmd="strikeThrough" title="취소선"><s>가</s></button>
+      <span class="fmt-sep"></span>
+      <select id="f-font" title="글꼴"><option value="">글꼴</option></select>
+      <select id="f-size" title="글자 크기"><option value="">크기</option></select>
+      <span class="fmt-sep"></span>
+      <span class="pal-wrap"><button id="f-color" title="글자색"><span class="a">가</span><span id="f-color-sw" class="swatch"></span></button><div id="pal-color" class="pal" hidden></div></span>
+      <span class="pal-wrap"><button id="f-bg" title="형광펜"><span class="a hl">가</span><span id="f-bg-sw" class="swatch"></span></button><div id="pal-bg" class="pal" hidden></div></span>
+      <span class="fmt-sep"></span>
+      <button data-cmd="insertUnorderedList" title="글머리 목록">• 목록</button>
+      <button data-cmd="insertOrderedList" title="번호 목록">1. 목록</button>
+      <button id="f-task" title="할 일 상자">☑ 할 일</button>
+      <span class="fmt-sep"></span>
+      <button id="f-table" title="표 넣기">▦ 표</button>
+      <span id="f-tablebar" class="fmt-group" hidden>
+        <button id="f-row-add" title="아래에 줄 더하기">줄＋</button><button id="f-col-add" title="오른쪽에 칸 더하기">칸＋</button>
+        <button id="f-row-del" title="이 줄 지우기">줄－</button><button id="f-col-del" title="이 칸 열 지우기">칸－</button>
+      </span>
+      <button id="f-image" title="그림 넣기">그림</button>
+      <button id="f-link" title="링크 걸기">링크</button>
+      <button id="f-break" title="여기서 다음 쪽으로">쪽 나누기</button>
+      <span class="fmt-gap"></span>
+      <button id="f-clear" title="선택한 글의 꾸밈을 모두 지우기">서식 지우기</button>
+      <input id="f-image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
     </div>
     <div class="desk">
       <div id="empty-state" class="empty-page">
@@ -76,7 +109,7 @@
     <footer class="statusbar">
       <span id="status" class="status">준비</span>
       <span class="sb-gap"></span>
-      <span class="sb-hint">/ 블록 넣기 · Esc 편집 끝 · Ctrl+휠 확대</span>
+      <span class="sb-hint">/ 블록 넣기 · Shift+Enter 줄바꿈 · Esc 편집 끝 · Ctrl+휠 확대</span>
       <span id="pages" class="count"></span>
       <span id="count" class="count"></span>
       <span class="zoom"><button id="zoom-out" class="icon-btn" title="축소">－</button><button id="zoom-val" class="icon-btn" title="100%로">100%</button><button id="zoom-in" class="icon-btn" title="확대">＋</button></span>

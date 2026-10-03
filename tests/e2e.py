@@ -53,15 +53,15 @@ with sync_playwright() as p:
     assert "덧붙임" in files()["시작.md"], "편집 저장"
     page.click(".sheet:last-child .sheet-body", position={"x": 20, "y": 860}); page.keyboard.type("/표"); page.wait_for_selector(".slash-item"); page.keyboard.press("Enter"); page.keyboard.press("Escape"); time.sleep(1.2)
     assert "| 항목 | 내용 |" in files()["시작.md"], "/ 메뉴"
-    page.click(".doc a:has-text('바깥')"); time.sleep(0.3)
+    page.click(".doc a:has-text('바깥')", modifiers=["Control"]); time.sleep(0.3)  # 서식 편집 중엔 Ctrl+클릭이 링크 열기
     assert "바깥 주소는 열지 않습니다" in page.inner_text("#status")
-    page.click(".doc a:has-text('회의록')"); page.wait_for_selector(".doc h1:has-text('1차 회의')")
+    page.click(".doc a:has-text('회의록')", modifiers=["Control"]); page.wait_for_selector(".doc h1:has-text('1차 회의')")
     assert page.locator(".callout").count() == 1 and page.locator(".doc table").count() == 1
     page.fill("#search", "참고 상자"); time.sleep(0.4)
     assert any("1차" in t for t in page.locator(".tree-row").all_inner_texts())
     page.fill("#search", "")
     # 파일 메뉴 → 새 문서 → 쓰고 → Ctrl+S(다른 이름으로 저장)
-    page.click("#btn-file"); page.click("#m-new"); page.wait_for_selector(".block-edit")
+    page.click("#btn-file"); page.click("#m-new"); page.wait_for_selector(".block.editing")
     page.keyboard.type("새 문서 본문"); page.keyboard.press("Escape")
     page.keyboard.press("Control+s"); time.sleep(1)
     assert "새 문서.md" in files() and "새 문서 본문" in files()["새 문서.md"], files().keys()
@@ -75,6 +75,22 @@ with sync_playwright() as p:
     assert sheets >= 3 and abs(w - 793.7) < 3 and last_has_new
     over = page.evaluate("[...document.querySelectorAll('.sheet-body')].filter(b => b.scrollHeight > b.clientHeight + 2 && b.childElementCount > 1).length")
     assert over == 0, f"넘친 쪽 {over}"
+    # 서식 편집기: 단어를 골라 굵게·빨강, 표를 넣고 칸에 쓰기, 긴 표는 쪽을 넘어 잘린다(머리 줄 반복)
+    page.click(".tree-row:has-text('시작')"); page.wait_for_selector(".doc h1:has-text('시작')")
+    page.click(".doc p >> nth=0"); page.keyboard.press("Home")
+    for _ in range(2): page.keyboard.press("Shift+ArrowRight")
+    page.click("#fmt [data-cmd=bold]"); page.click("#f-color"); page.click("#pal-color button >> nth=3"); page.keyboard.press("Escape"); time.sleep(1.2)
+    assert '**<span style="color:#c00000">첫 </span>**' in files()["시작.md"], files()["시작.md"]
+    page.click(".doc p >> nth=0"); page.click("#f-table"); time.sleep(0.3)  # 대화상자 → "4 × 2"는 기본값으로 받는다
+    page.keyboard.type("가"); page.keyboard.press("Tab"); page.keyboard.type("나"); page.keyboard.press("Escape"); time.sleep(1.2)
+    assert "| 가 | 나 |" in files()["시작.md"], files()["시작.md"]
+    page.evaluate("""() => { window.__files["긴 표.md"] = "# 긴 표\\n\\n| 구분 | 내용 |\\n| --- | --- |\\n" + Array.from({length: 70}, (_, n) => `| 항목 ${n} | 내용 ${n} |`).join("\\n") + "\\n\\n끝 문단\\n"; }""")
+    page.click("#btn-folder"); page.wait_for_selector(".tree-row:has-text('긴 표')"); page.click(".tree-row:has-text('긴 표')"); page.wait_for_selector(".doc h1:has-text('긴 표')"); time.sleep(0.5)
+    conts, theads = page.locator(".block.cont").count(), page.locator(".doc thead").count()
+    over = page.evaluate("[...document.querySelectorAll('.sheet-body')].filter(b => b.scrollHeight > b.clientHeight + 2).length")
+    print("긴 표: 이어 붙인 조각", conts, "| 머리 줄", theads, "| 넘친 쪽", over)
+    assert conts >= 1 and theads == conts + 1 and over == 0 and page.locator(".sheet").last.locator("p:has-text('끝 문단')").count() == 1
+    page.click(".tree-row:has-text('긴 문서')"); page.wait_for_selector(".doc h1:has-text('긴 문서')"); time.sleep(0.5)
     # 확대·축소: Ctrl+휠로 줄이면 쪽이 나란히
     page.mouse.move(700, 400)
     for _ in range(6): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.05)

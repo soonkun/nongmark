@@ -78,3 +78,14 @@ test("독립 검토 지적 - 백슬래시 외부 주소·상대 링크·긴 줄�
   assert.match(md.renderDoc("## 제목 ##"), /<h2>제목<\/h2>/);
   assert.match(md.renderDoc("# C#"), /<h1>C#<\/h1>/);
 });
+
+test("글자 꾸밈 인라인 HTML: 검사된 값만 data-속성으로, 그 밖의 태그·속성은 글자로", () => {
+  const out = md.inline('<span style="color:#c00; background-color: rgb(255,255,0); font-family: 바탕, serif; font-size:14pt">빨강</span> <u>밑줄</u> 줄<br>바꿈 \\*별\\*');
+  assert.equal(out, '<span class="st" data-color="#cc0000" data-bg="#ffff00" data-font="바탕" data-size="14pt">빨강</span> <u>밑줄</u> 줄<br>바꿈 *별*');
+  assert.equal(md.inline('<span style="color:#c00" onclick="x">a</span>'), "&lt;span style=&quot;color:#c00&quot; onclick=&quot;x&quot;&gt;a&lt;/span&gt;");
+  assert.equal(md.inline('<span style="color:url(x);font-family:a;b">x</span>'), '<span class="st" data-font="a">x</span>'); // 틀린 값(color)만 버린다
+  assert.equal(md.inline('<span style="color:url(x)">x</span>'), "x"); // 남는 값이 없으면 꾸밈 없이 글자만
+  assert.equal(md.inline('<span style="background:expression(1)">x</span><img src=x onerror=alert(1)>'), "x&lt;img src=x onerror=alert(1)&gt;");
+  assert.deepEqual(md.inlineRuns('<span style="color:#c00000">**굵**</span>'), [{ color: "#c00000", b: true, text: "굵" }]);
+  assert.equal(md.parseStyle("font-size: 400pt; color: red"), null);
+});
