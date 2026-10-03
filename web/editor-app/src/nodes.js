@@ -187,14 +187,16 @@ export const PERIOD = PAGE.top + PAGE.contentH + PAGE.bottom + PAGE.gap; // 흐�
 function alignGaps(view) {
   const sheet = view.dom.closest(".nm-sheet");
   if (!sheet) return 0;
+  // 좌표는 편집기 뿌리(.nm-pm, position: relative) 기준이다. 뿌리는 sheet의 위 여백(PAGE.top) 아래에서 시작하므로
+  // 쪽 k의 내용은 뿌리 기준 k×PERIOD 에서 시작해야 한다(= sheet 기준 k×PERIOD + 위 여백).
   const gaps = [...view.dom.querySelectorAll(":scope > .nm-pagegap")];
   gaps.forEach((g, i) => {
-    const want = (i + 1) * PERIOD + PAGE.top; // 다음 쪽 첫 블록이 와야 할 자리(sheet 기준)
+    const want = (i + 1) * PERIOD; // 다음 쪽 첫 블록이 와야 할 자리(뿌리 기준)
     const top = g.offsetTop; // 여기까지 앞 쪽 내용이 끝났다
     setGapHeight(g, Math.max(PAGE.gap + PAGE.top, want - top));
   });
   // 마지막 쪽도 꼭 한 장 높이가 되게
-  const used = view.dom.offsetTop + view.dom.offsetHeight; // 흐름 끝(sheet 기준)
+  const used = PAGE.top + view.dom.offsetHeight; // 흐름 끝(sheet 기준)
   const pages = gaps.length + 1;
   const pad = pages * PERIOD - PAGE.gap - used;
   sheet.style.paddingBottom = sheet.classList.contains("flow") ? "" : Math.max(0, pad) + "px";

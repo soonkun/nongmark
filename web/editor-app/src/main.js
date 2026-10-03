@@ -13,7 +13,7 @@ import DragHandle from "@tiptap/extension-drag-handle";
 import Suggestion from "@tiptap/suggestion";
 import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
-import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages, TableResize, PERIOD } from "./nodes.js";
+import { Callout, CALLOUTS, PageBreak, NmTableCell, NmTableHeader, NmImage, MoveBlock, Pages, TableResize, PERIOD, PAGE } from "./nodes.js";
 import { docFromMd, mdFromDoc } from "./convert.js";
 import MD from "../../markdown.js";
 
@@ -218,17 +218,17 @@ function create(container, opts = {}) {
 
   /* 격자(쪽 나란히) 보기. 문서 흐름(.nm-sheet)은 하나이고 쪽마다 창(.nm-slot)을 둔다. 커서가 있는 쪽의 창에는 진짜 편집기를(쪽 위치만큼 위로 밀어서),
      나머지 창에는 복제본을 보여 준다. 쪽 경계 위젯 덕에 흐름에서 쪽 k는 정확히 k×(297mm+24px) 위치에서 시작한다. 1·2쪽, 그 아래 3·4쪽… 편집은 그대로. */
-  const PAGE_H = Math.round(297 * 96 / 25.4);
   const grid = { on: false, cols: 2, live: 0, slots: [], box: null, timer: 0, dirty: new Set(), io: null };
   const shift = (elm, k) => { elm.style.transform = `translateY(${-k * PERIOD}px)`; };
   /** 쪽 k의 복제본: 그 쪽에 걸린 블록만 떠서(문서 전체가 아니라) 제자리에 놓는다. 쪽 수가 많아도 한 쪽 채우는 값은 그 쪽 분량뿐. */
   function pageClone(k) {
     const c = el("div", "nm-sheet-clone nm-pm"); // .nm-pm 스타일(제목·표…)이 그대로 먹게
-    const y0 = k * PERIOD, y1 = y0 + PAGE_H;
+    // 블록 위치는 편집기 뿌리(.nm-pm) 기준이고 쪽 k의 내용은 k×PERIOD 에서 시작한다. 복제본은 sheet처럼 여백(위 30mm·왼쪽 20mm)을 더해 놓는다
+    const y0 = k * PERIOD, y1 = y0 + PAGE.contentH;
     for (const b of editor.view.dom.children) {
       if (b.classList.contains("nm-pagegap")) continue;
       const top = b.offsetTop, bottom = top + b.offsetHeight;
-      if (bottom <= y0 || top >= y1) continue;
+      if (bottom <= y0 || top >= y1 + 1) continue;
       const d = b.cloneNode(true);
       d.removeAttribute("contenteditable");
       d.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
@@ -236,8 +236,8 @@ function create(container, opts = {}) {
       d.classList.remove("ProseMirror-selectednode");
       d.querySelectorAll(".ProseMirror-selectednode, .selectedCell").forEach((e) => e.classList.remove("ProseMirror-selectednode", "selectedCell"));
       d.style.position = "absolute";
-      d.style.left = b.offsetLeft + "px";
-      d.style.top = top - y0 + "px";
+      d.style.left = b.offsetLeft + PAGE.sideL + "px";
+      d.style.top = top - y0 + PAGE.top + "px";
       d.style.width = b.offsetWidth + "px";
       d.style.margin = "0";
       c.append(d);
