@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"nongmak/internal/loader"
 	"nongmak/internal/webview"
@@ -34,16 +35,37 @@ func main() {
 		showError(msg)
 		return
 	}
-	ws := &workspace{}
-	target := ""
-	if len(os.Args) > 1 {
-		target = os.Args[1]
+	// 연 폴더 등록부: 탭마다 문서가 다른 폴더에 있을 수 있어, 사용자가 대화상자(또는 더블클릭)로 연 폴더마다 os.Root를 하나씩 둔다.
+	// 화면은 info.dir 문자열로 폴더를 가리키고, 등록되지 않은 폴더는 어떤 함수도 받지 않는다.
+	var mu sync.Mutex
+	opened := map[string]*workspace{}
+	register := func(ws *workspace) (info, error) {
+		i, _ := ws.Info()
+		mu.Lock()
+		defer mu.Unlock()
+		if old, ok := opened[i.Dir]; ok && old != ws {
+			ws.fsroot.Close() // 같은 폴더는 하나만
+			return info{Root: i.Root, Dir: i.Dir, Open: i.Open}, nil
+		}
+		opened[i.Dir] = ws
+		return i, nil
 	}
-	if target != "" {
-		if err := ws.openTarget(target); err != nil {
+	get := func(dir string) (*workspace, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if ws, ok := opened[dir]; ok {
+			return ws, nil
+		}
+		return nil, errors.New("열지 않은 폴더입니다")
+	}
+	ws := &workspace{}
+	first := info{}
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		if err := ws.openTarget(os.Args[1]); err != nil {
 			showError(err.Error())
 			return
 		}
+		first, _ = register(ws)
 	}
 	data := filepath.Join(os.Getenv("LOCALAPPDATA"), "Nongmak", "WebView2")
 	w := webview.NewWithOptions(webview.WebViewOptions{
@@ -51,7 +73,7 @@ func main() {
 		AutoFocus: true,
 		DataPath:  data,
 		WindowOptions: webview.WindowOptions{
-			Title: title(ws), Width: 1280, Height: 860, IconId: 1, Center: true,
+			Title: title(first), Width: 1280, Height: 860, IconId: 1, Center: true,
 		},
 	})
 	if w == nil {
@@ -67,37 +89,48 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	must("nm_info", ws.Info)
-	must("nm_list", ws.List)
-	must("nm_read", ws.Read)
-	must("nm_write", ws.Write)
-	must("nm_remove", ws.Remove)
-	must("nm_rename", ws.Rename)
-	must("nm_mkdir", ws.Mkdir)
-	must("nm_saveAsset", ws.SaveAsset)
-	must("nm_image", ws.Image)
+	must("nm_info", func() (info, error) { return first, nil })
+	must("nm_read", func(dir, rel string) (string, error) {
+		ws, err := get(dir)
+		if err != nil {
+			return "", err
+		}
+		return ws.Read(rel)
+	})
+	must("nm_write", func(dir, rel, text string) error {
+		ws, err := get(dir)
+		if err != nil {
+			return err
+		}
+		return ws.Write(rel, text)
+	})
+	must("nm_saveAsset", func(dir, file, b64 string) (string, error) {
+		ws, err := get(dir)
+		if err != nil {
+			return "", err
+		}
+		return ws.SaveAsset(file, b64)
+	})
+	must("nm_image", func(dir, rel string) (string, error) {
+		ws, err := get(dir)
+		if err != nil {
+			return "", err
+		}
+		return ws.Image(rel)
+	})
 	must("nm_setTitle", func(t string) { w.SetTitle(cut(t, 120) + " - 새싹이의 농막") })
 	must("nm_openFile", func() (info, error) {
 		p := openFileDialog(hwnd(w))
 		if p == "" {
 			return info{}, nil
 		}
+		ws := &workspace{}
 		if err := ws.openTarget(p); err != nil {
 			return info{}, err
 		}
-		return ws.Info()
+		return register(ws)
 	})
-	must("nm_openFolder", func() (info, error) {
-		p := folderDialog(hwnd(w))
-		if p == "" {
-			return info{}, nil
-		}
-		if err := ws.setDir(p, ""); err != nil {
-			return info{}, err
-		}
-		return ws.Info()
-	})
-	// 다른 이름으로 저장: 어디든 고른 곳에 쓰고, 그 폴더를 새 작업 폴더로 삼는다.
+	// 다른 이름으로 저장: 어디든 고른 곳에 쓰고, 그 폴더를 등록한다.
 	must("nm_saveAs", func(suggest, text string) (info, error) {
 		p := saveFileDialog(hwnd(w), suggest)
 		if p == "" {
@@ -106,13 +139,19 @@ func main() {
 		if !strings.EqualFold(filepath.Ext(p), ".md") && !strings.EqualFold(filepath.Ext(p), ".markdown") {
 			p += ".md"
 		}
+		ws := &workspace{}
 		if err := ws.setDir(filepath.Dir(p), filepath.Base(p)); err != nil {
 			return info{}, err
 		}
+		i, err := register(ws)
+		if err != nil {
+			return info{}, err
+		}
+		ws, _ = get(i.Dir)
 		if err := ws.Write(filepath.Base(p), text); err != nil {
 			return info{}, err
 		}
-		return ws.Info()
+		return i, nil
 	})
 	must("nm_alert", func(text string) { showInfo(cut(text, 2000)) })
 	// 내보내기(hwpx 등): 사용자가 저장 창에서 고른 곳에만 쓴다. 확장자는 hwpx·pdf만.
@@ -138,8 +177,7 @@ func main() {
 	w.Run()
 }
 
-func title(ws *workspace) string {
-	i, _ := ws.Info()
+func title(i info) string {
 	if i.Open != "" {
 		return strings.TrimSuffix(i.Open, filepath.Ext(i.Open)) + " - 새싹이의 농막"
 	}

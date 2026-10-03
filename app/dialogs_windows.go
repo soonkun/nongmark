@@ -2,7 +2,7 @@
 
 package main
 
-// 파일·폴더 고르기 창 - Windows 기본 대화상자(comdlg32 GetOpenFileNameW/GetSaveFileNameW, shell32 SHBrowseForFolderW).
+// 파일 고르기 창 - Windows 기본 대화상자(comdlg32 GetOpenFileNameW/GetSaveFileNameW).
 
 import (
 	"syscall"
@@ -10,14 +10,9 @@ import (
 )
 
 var (
-	comdlg32            = sysDLL("comdlg32.dll")
-	getOpenFileName     = comdlg32.NewProc("GetOpenFileNameW")
-	getSaveFileName     = comdlg32.NewProc("GetSaveFileNameW")
-	shell32dlg          = sysDLL("shell32.dll")
-	shBrowseForFolder   = shell32dlg.NewProc("SHBrowseForFolderW")
-	shGetPathFromIDList = shell32dlg.NewProc("SHGetPathFromIDListW")
-	ole32               = sysDLL("ole32.dll")
-	coTaskMemFree       = ole32.NewProc("CoTaskMemFree")
+	comdlg32        = sysDLL("comdlg32.dll")
+	getOpenFileName = comdlg32.NewProc("GetOpenFileNameW")
+	getSaveFileName = comdlg32.NewProc("GetSaveFileNameW")
 )
 
 type openFileNameW struct {
@@ -103,31 +98,4 @@ func fileDialog(owner uintptr, save bool, suggest, ext string) string {
 func openFileDialog(owner uintptr) string { return fileDialog(owner, false, "", "md") }
 func saveFileDialog(owner uintptr, suggest string) string {
 	return fileDialog(owner, true, suggest, "md")
-}
-
-type browseInfoW struct {
-	owner       uintptr
-	root        uintptr
-	displayName *uint16
-	title       *uint16
-	flags       uint32
-	callback    uintptr
-	lParam      uintptr
-	image       int32
-}
-
-func folderDialog(owner uintptr) string {
-	name := make([]uint16, 260)
-	title, _ := syscall.UTF16PtrFromString("문서를 모아 둘 폴더를 고르세요")
-	bi := browseInfoW{owner: owner, displayName: &name[0], title: title, flags: 0x0001 | 0x0040} // 폴더만 | 새 스타일
-	pidl, _, _ := shBrowseForFolder.Call(uintptr(unsafe.Pointer(&bi)))
-	if pidl == 0 {
-		return ""
-	}
-	defer coTaskMemFree.Call(pidl)
-	path := make([]uint16, 32768)
-	if r, _, _ := shGetPathFromIDList.Call(pidl, uintptr(unsafe.Pointer(&path[0]))); r == 0 {
-		return ""
-	}
-	return syscall.UTF16ToString(path)
 }

@@ -1,8 +1,7 @@
-// 새싹이의 농막 화면. 블록 단위 편집(노션식): 블록을 누르면 그 블록의 마크다운 원문이 열리고, 벗어나면 다시 그려진다.
-// 저장소는 셋 중 하나 - 모두 같은 함수 모양(list/read/write/remove/rename/mkdir/saveAsset/imageUrl)을 갖는다:
-//   native : nongmak.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음).
-//   folder : 브라우저에서 nongmak.html을 열고 "폴더 열기"(File System Access API, Edge·Chrome).
-//   single : 둘 다 안 될 때 - 파일 하나를 열고 내려받기로 저장.
+// 새싹이의 농막 화면. 메모장·한글처럼 문서를 탭으로 열고(폴더 보기 없음), 블록 단위로 바로 고친다(서식 편집기).
+// 저장소는 둘 중 하나 - 같은 함수 모양(read/write/saveAsset/imageUrl)을 갖는다:
+//   native : nongmak.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음). 문서가 든 폴더(dir)가 열쇠.
+//   single : 브라우저에서 nongmak.html을 연 경우 - 파일 하나를 열고 내려받기로 저장.
 // 네트워크: 이 코드는 어디에도 연결하지 않는다. 페이지의 CSP가 connect-src 'none'으로 막는다.
 
 "use strict";
@@ -31,70 +30,15 @@ function blobToBase64(blob) {
 }
 
 function nativeStore(info) {
+  const dir = info.dir; // 프로그램이 등록한 폴더만 받는다
   return {
     kind: "native",
     rootName: info.root,
-    dir: info.dir,
-    list: () => window.nm_list(),
-    read: (p) => window.nm_read(p),
-    write: (p, text) => window.nm_write(p, text),
-    remove: (p) => window.nm_remove(p),
-    rename: (a, b) => window.nm_rename(a, b),
-    mkdir: (p) => window.nm_mkdir(p),
-    async saveAsset(name, blob) { return window.nm_saveAsset(name, await blobToBase64(blob)); },
-    imageUrl: (p) => window.nm_image(p), // data: 주소
-  };
-}
-
-function folderStore(dir) {
-  const walk = async (path, create) => {
-    const parts = path.split("/").filter(Boolean);
-    let h = dir;
-    for (const part of parts.slice(0, -1)) h = await h.getDirectoryHandle(part, { create });
-    return { parent: h, name: parts[parts.length - 1] };
-  };
-  const fileHandle = async (path, create = false) => {
-    const { parent, name } = await walk(path, create);
-    return parent.getFileHandle(name, { create });
-  };
-  const write = async (path, data) => {
-    const w = await (await fileHandle(path, true)).createWritable();
-    await w.write(data);
-    await w.close();
-  };
-  return {
-    kind: "folder",
-    rootName: dir.name,
-    async list() {
-      const out = [];
-      const rec = async (h, prefix, depth) => {
-        if (depth > 8) return;
-        for await (const [name, child] of h.entries()) {
-          if (name.startsWith(".") || name === "node_modules") continue;
-          const p = prefix + name;
-          if (child.kind === "directory") {
-            out.push({ path: p, dir: true });
-            await rec(child, p + "/", depth + 1);
-          } else if (MD_EXT.test(name)) out.push({ path: p, dir: false });
-        }
-      };
-      await rec(dir, "", 0);
-      return out;
-    },
-    async read(p) { return (await (await fileHandle(p)).getFile()).text(); },
-    write,
-    async remove(p) { const { parent, name } = await walk(p, false); await parent.removeEntry(name); },
-    async rename(a, b) {
-      const data = await (await (await fileHandle(a)).getFile()).arrayBuffer();
-      try { await fileHandle(b); throw new Error("같은 이름의 파일이 이미 있습니다."); } catch (e) { if (e.name !== "NotFoundError") throw e; }
-      await write(b, data);
-      const { parent, name } = await walk(a, false);
-      await parent.removeEntry(name);
-    },
-    async mkdir(p) { await walk(p + "/x", true); },
-    async saveAsset(name, blob) { const p = "assets/" + name; await write(p, blob); return p; },
-    async imageUrl(p) { return URL.createObjectURL(await (await fileHandle(p)).getFile()); },
-    async imageBytes(p) { return new Uint8Array(await (await (await fileHandle(p)).getFile()).arrayBuffer()); },
+    dir,
+    read: (p) => window.nm_read(dir, p),
+    write: (p, text) => window.nm_write(dir, p, text),
+    async saveAsset(name, blob) { return window.nm_saveAsset(dir, name, await blobToBase64(blob)); },
+    imageUrl: (p) => window.nm_image(dir, p), // data: 주소
   };
 }
 
@@ -103,7 +47,7 @@ function singleStore(name, text) {
   return {
     kind: "single",
     rootName: "",
-    async list() { return Object.keys(files).map((p) => ({ path: p, dir: false })); },
+    dir: "",
     async read(p) { return files[p]; },
     async write(p, t) {
       files[p] = t;
@@ -113,20 +57,20 @@ function singleStore(name, text) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     },
-    async remove(p) { delete files[p]; },
-    async rename(a, b) { files[b] = files[a]; delete files[a]; },
-    async mkdir() { throw new Error("파일 하나만 연 상태에서는 폴더를 만들 수 없습니다."); },
-    async saveAsset() { throw new Error("그림 붙여넣기는 폴더를 연 뒤에 쓸 수 있습니다."); },
+    async saveAsset() { throw new Error("그림 넣기는 프로그램 창(nongmak.exe)에서 쓸 수 있습니다."); },
     async imageUrl() { throw new Error("no folder"); },
   };
 }
 
 /* ---------------- 상태 ---------------- */
 
+// 아래 DOC_FIELDS는 "지금 보는 문서"의 것이고, 탭을 바꿀 때 state.tabs[]의 자리와 맞바꾼다.
+const DOC_FIELDS = ["store", "path", "untitled", "blocks", "dirty", "imageCache"];
 const state = {
+  tabs: [], // {store, path, untitled, blocks, dirty, imageCache}
+  tab: -1,
   store: null,
-  entries: [],
-  path: null, // 지금 연 파일
+  path: null, // 지금 연 파일(폴더 기준 상대 경로)
   untitled: false, // 아직 저장한 적 없는 새 문서
   zoom: 1,
   blocks: [],
@@ -136,8 +80,6 @@ const state = {
   rich: true, // 편집기(서식 도구) 모드. false면 블록을 누를 때 마크다운 원문 상자가 열린다
   saveTimer: null,
   imageCache: new Map(),
-  collapsed: new Set(),
-  cache: new Map(), // 검색용 본문
 };
 
 const status = (text, kind = "") => {
@@ -146,87 +88,84 @@ const status = (text, kind = "") => {
   s.className = "status " + kind;
 };
 
-/* ---------------- 파일 목록 ---------------- */
+/* ---------------- 탭(열린 문서) ---------------- */
 
-async function refreshTree() {
-  state.entries = (await state.store.list()).sort((a, b) => a.path.localeCompare(b.path, "ko"));
-  renderTree();
+const docName = () => (state.path ? state.path.split("/").pop().replace(MD_EXT, "") : (MD.titleOf(state.blocks.join("\n\n")) || "새 문서").replace(/[\\/:*?"<>|]/g, " ").trim().slice(0, 60) || "새 문서");
+
+function snapshot() {
+  if (state.tab < 0 || !state.tabs[state.tab]) return;
+  for (const k of DOC_FIELDS) state.tabs[state.tab][k] = state[k];
 }
 
-function renderTree() {
-  const tree = $("#tree");
-  tree.textContent = "";
-  const filter = $("#search").value.trim().toLowerCase();
-  const hits = filter ? searchHits(filter) : null;
-  for (const entry of state.entries) {
-    const parts = entry.path.split("/");
-    const parentHidden = parts.slice(0, -1).some((_, i) => state.collapsed.has(parts.slice(0, i + 1).join("/")));
-    if (hits) {
-      if (entry.dir || !hits.has(entry.path)) continue;
-    } else if (parentHidden) continue;
-    const row = el("div", "tree-row" + (entry.dir ? " dir" : "") + (entry.path === state.path ? " active" : ""));
-    row.style.paddingLeft = (hits ? 8 : 8 + (parts.length - 1) * 14) + "px";
-    const name = parts[parts.length - 1];
-    if (entry.dir) {
-      row.append(el("span", "twisty", state.collapsed.has(entry.path) ? "▸" : "▾"), el("span", "name", name));
-      row.onclick = () => {
-        state.collapsed.has(entry.path) ? state.collapsed.delete(entry.path) : state.collapsed.add(entry.path);
-        renderTree();
-      };
-    } else {
-      row.append(el("span", "page-icon", "📄"), el("span", "name", hits ? entry.path : name.replace(MD_EXT, "")));
-      row.title = entry.path;
-      row.onclick = () => openFile(entry.path);
-      if (hits && hits.get(entry.path)) row.append(el("div", "snippet", hits.get(entry.path)));
-    }
-    tree.append(row);
+/** 탭 j를 보여 준다. 지금 문서는 반영·저장해 두고(제목 없는 새 문서는 탭에 남는다) 자리를 바꾼다. */
+async function activate(j) {
+  if (state.tab >= 0) {
+    commitEdit();
+    if (state.dirty && !state.untitled && state.store?.kind === "native") await save();
+    snapshot();
   }
-  if (!tree.childElementCount) tree.append(el("div", "empty", filter ? "찾은 페이지가 없습니다." : "페이지가 없습니다. ＋ 새 페이지로 시작하세요."));
+  state.tab = j;
+  for (const k of DOC_FIELDS) state[k] = state.tabs[j][k];
+  state.editing = -1;
+  closeSlash();
+  if (state.raw) $("#raw").value = state.blocks.join("\n\n") + "\n";
+  renderTabs();
+  setDocTitle();
+  renderDoc();
+  status(state.untitled ? "저장하지 않은 새 문서 (Ctrl+S)" : "열림");
 }
 
-function searchHits(q) {
-  const hits = new Map();
-  for (const e of state.entries) {
-    if (e.dir) continue;
-    if (e.path.toLowerCase().includes(q)) hits.set(e.path, "");
-    const text = state.cache.get(e.path);
-    if (text) {
-      const i = text.toLowerCase().indexOf(q);
-      if (i >= 0) hits.set(e.path, (i > 20 ? "…" : "") + text.slice(Math.max(0, i - 20), i + q.length + 40).replace(/\s+/g, " "));
-    }
+function addTab(doc) {
+  snapshot();
+  state.tabs.push({ untitled: false, dirty: false, imageCache: new Map(), ...doc });
+  return activate(state.tabs.length - 1);
+}
+
+async function closeTab(j) {
+  const t = state.tabs[j];
+  if (j === state.tab) {
+    if (!(await flush())) return;
+  } else if (t.dirty && (t.untitled || t.store.kind !== "native") && !confirm(`"${t.untitled ? "새 문서" : t.path}"에 저장하지 않은 내용이 있습니다. 버리고 닫을까요?`)) return;
+  t.imageCache.forEach((u) => { if (String(u).startsWith("blob:")) URL.revokeObjectURL(u); });
+  state.tabs.splice(j, 1);
+  if (!state.tabs.length) {
+    state.tab = -1;
+    return newDocument();
   }
-  return hits;
+  state.tab = j < state.tab ? state.tab - 1 : Math.min(state.tab, state.tabs.length - 1);
+  if (j === state.tab || j === state.tabs.length) { const k = Math.min(j, state.tabs.length - 1); state.tab = -1; return activate(k); }
+  renderTabs();
 }
 
-async function warmSearch() {
-  // 검색을 위해 본문을 읽어 둔다(파일이 많으면 처음 한 번 조금 걸린다)
-  for (const e of state.entries) {
-    if (e.dir || state.cache.has(e.path)) continue;
-    try { state.cache.set(e.path, await state.store.read(e.path)); } catch { /* 읽을 수 없는 파일은 건너뛴다 */ }
-  }
+function renderTabs() {
+  const bar = $("#tabs");
+  bar.querySelectorAll(".tab").forEach((t) => t.remove());
+  const add = $("#tab-add");
+  state.tabs.forEach((t, j) => {
+    const live = j === state.tab ? state : t;
+    const name = live.path ? live.path.split("/").pop().replace(MD_EXT, "") : "새 문서";
+    const tab = el("div", "tab" + (j === state.tab ? " on" : ""));
+    tab.title = live.store?.dir ? live.store.dir + "\\" + (live.path || "") : name;
+    tab.append(el("span", "tab-name", name), el("span", "tab-dot" + (live.dirty || live.untitled ? " show" : ""), "●"));
+    const x = el("button", "tab-x", "×");
+    x.title = "닫기 (Ctrl+W)";
+    x.onclick = (ev) => { ev.stopPropagation(); closeTab(j); };
+    tab.append(x);
+    tab.onclick = () => { if (j !== state.tab) activate(j); };
+    tab.onauxclick = (ev) => { if (ev.button === 1) closeTab(j); };
+    bar.insertBefore(tab, add);
+  });
 }
 
-/* ---------------- 문서 열기·저장 ---------------- */
-
-async function openFile(path) {
-  if (!(await flush())) return;
+/** 폴더(store) 안의 문서를 탭으로 연다. 이미 열려 있으면 그 탭으로. */
+async function openPath(store, path) {
+  const j = state.tabs.findIndex((t, k) => { const d = k === state.tab ? state : t; return d.store?.dir === store.dir && d.path === path; });
+  if (j >= 0) return activate(j);
   try {
-    const text = await state.store.read(path);
-    state.path = path;
-    state.cache.set(path, text);
-    state.blocks = MD.splitBlocks(text);
-    state.dirty = false;
-    state.editing = -1;
-    $("#raw").value = text;
-    state.untitled = false;
-    setDocTitle(path.split("/").pop().replace(MD_EXT, ""), path);
-    renderDoc();
-    renderTree();
-    status("열림");
-    $("#empty-state").hidden = true;
-    $("#page").hidden = false;
+    const text = await store.read(path);
+    await addTab({ store, path, blocks: MD.splitBlocks(text) });
   } catch (e) {
-    status("열지 못했습니다: " + e.message, "error");
+    status("열지 못했습니다: " + (e.message || e), "error");
   }
 }
 
@@ -243,9 +182,9 @@ const isCodeBlock = (md) => /^\s*(```|~~~)/.test(md);
 const sourceOnly = (md) => isCodeBlock(md) || (!md.includes("\n") && (MD.RE.hr.test(md) || MD.RE.pagebreak.test(md)));
 const docText = () => (syncEditing(), state.raw ? $("#raw").value : state.blocks.join("\n\n") + "\n");
 
-function setDocTitle(name, path) {
-  $("#pagename").textContent = name;
-  $("#crumb").textContent = path && path.includes("/") ? path.split("/").slice(0, -1).join(" › ") + " ›" : state.store?.rootName ? state.store.rootName + " ›" : "";
+function setDocTitle() {
+  const name = state.path ? docName() : "새 문서";
+  $("#docpath").textContent = state.store?.dir && state.path ? state.store.dir + "\\" + state.path.replace(/\//g, "\\") : state.untitled ? "저장하지 않은 새 문서" : "";
   document.title = name + " - 새싹이의 농막";
   if (NATIVE) window.nm_setTitle(name);
 }
@@ -256,7 +195,7 @@ function countChars() {
 }
 
 function changed() {
-  state.dirty = true;
+  if (!state.dirty) { state.dirty = true; renderTabs(); }
   countChars();
   if (state.untitled) return status("저장하지 않은 새 문서 (Ctrl+S)");
   status(state.store.kind === "single" ? "저장 안 됨 (Ctrl+S로 내려받기)" : "저장 중…");
@@ -273,8 +212,8 @@ async function save() {
   const text = docText();
   try {
     await state.store.write(state.path, text);
-    state.cache.set(state.path, text);
     state.dirty = false;
+    renderTabs();
     status("저장됨 · " + new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }), "ok");
     return true;
   } catch (e) {
@@ -415,7 +354,7 @@ function blockView(md, i) {
     body.addEventListener("paste", (ev) => richPaste(ev, i, body));
     body.addEventListener("blur", () => setTimeout(() => {
       if (!body.isConnected) return; // 다시 그려져 떨어져 나간 옛 요소의 blur
-      if (state.editing === i && document.activeElement !== body && !slash.open && !document.activeElement?.closest?.(".fmt")) commitEdit();
+      if (state.editing === i && document.activeElement !== body && !slash.open && !document.activeElement?.closest?.("#rail")) commitEdit();
     }, 120));
   }
   wrap.onclick = (ev) => {
@@ -492,7 +431,7 @@ function followLink(href) {
   }
   if (href.startsWith("#")) return;
   const p = resolvePath(href);
-  if (p && MD_EXT.test(p)) openFile(p);
+  if (p && MD_EXT.test(p)) openPath(state.store, p);
   else status("문서 링크(.md)만 열 수 있습니다: " + href, "error");
 }
 
@@ -958,18 +897,21 @@ function restoreSel() {
   return body;
 }
 
-/** 도구 줄의 켜짐 표시·표 도구 보이기를 지금 선택에 맞춘다. */
+const BLOCK_TYPES = [["p", "본문"], ["h1", "제목 1"], ["h2", "제목 2"], ["h3", "제목 3"], ["blockquote", "인용"], ["code", "코드"]];
+
+/** 도구 막대의 켜짐 표시·표 도구 보이기를 지금 선택에 맞춘다. */
 function fmtState() {
   const body = state.editing >= 0 ? editingBody(state.editing) : null;
   const inBlock = !!body && (() => { const sel = getSelection(); return sel.rangeCount && body.contains(sel.anchorNode); })();
-  for (const b of document.querySelectorAll("#fmt [data-cmd]")) {
+  for (const b of document.querySelectorAll("#rail [data-cmd]")) {
     let on = false;
     try { on = inBlock && document.queryCommandState(b.dataset.cmd); } catch { /* 명령을 모르는 경우 */ }
     b.classList.toggle("on", on);
   }
   $("#f-tablebar").hidden = !(inBlock && Editor.selectionIn(body, "td, th"));
   const blockEl = inBlock && Editor.selectionIn(body, "h1, h2, h3, h4, h5, h6, blockquote, pre");
-  $("#f-block").value = blockEl ? blockEl.tagName.toLowerCase().replace(/^h[4-6]$/, "h3").replace("pre", "code") : "p";
+  const type = blockEl ? blockEl.tagName.toLowerCase().replace(/^h[4-6]$/, "h3").replace("pre", "code") : "p";
+  $("#f-block .lb").textContent = (BLOCK_TYPES.find(([v]) => v === type) || BLOCK_TYPES[0])[1];
 }
 
 function insertBlocksAfter(parts, focus = 0, caret = "end") {
@@ -1059,6 +1001,39 @@ function insertLink() {
   changed();
 }
 
+function closePops() {
+  document.querySelectorAll(".pop").forEach((p) => (p.hidden = true));
+}
+
+/** 설명 상자를 단추 오른쪽에 놓는다(도구 막대가 스크롤돼도 잘리지 않게 화면 기준 고정 위치). */
+function placePop(pop) {
+  const r = pop.parentElement.querySelector("button").getBoundingClientRect();
+  pop.hidden = false;
+  const h = pop.offsetHeight;
+  pop.style.left = r.right + 6 + "px";
+  pop.style.top = Math.max(8, Math.min(r.top, window.innerHeight - h - 8)) + "px";
+}
+
+/** 도구 막대 단추 옆에 펼쳐지는 목록. items: [값, 이름, 작은 글(선택)]. */
+function showPop(id, items, onPick, current) {
+  const pop = $("#" + id);
+  const wasOpen = !pop.hidden;
+  closePops();
+  if (wasOpen) return;
+  pop.textContent = "";
+  for (const [value, name, hint] of items) {
+    const row = el("button", "pi" + (value === current ? " on" : ""));
+    row.append(el("span", "", name));
+    if (hint) row.append(el("small", "", hint));
+    if (id === "pop-font" && value) row.firstChild.style.fontFamily = `"${value}"`;
+    if (id === "pop-size" && value) row.firstChild.style.fontSize = value;
+    row.onmousedown = (ev) => ev.preventDefault();
+    row.onclick = () => { closePops(); onPick(value); };
+    pop.append(row);
+  }
+  placePop(pop);
+}
+
 function drawPalette(id, colors, kind) {
   const pal = $("#" + id);
   pal.textContent = "";
@@ -1077,9 +1052,9 @@ function drawPalette(id, colors, kind) {
 }
 
 function applyMark(kind, value) {
-  document.querySelectorAll(".pal").forEach((p) => (p.hidden = true));
+  closePops();
   const body = restoreSel();
-  if (!body) return;
+  if (!body) return status("먼저 글을 고르거나 커서를 놓으세요.");
   Editor.mark(body, kind, value);
   if (kind === "color") $("#f-color-sw").style.background = value === "none" ? "#000" : value;
   if (kind === "bg") $("#f-bg-sw").style.background = value === "none" ? "#ffff00" : value;
@@ -1088,22 +1063,21 @@ function applyMark(kind, value) {
 }
 
 function setupFmt() {
-  const fmt = $("#fmt");
-  fmt.addEventListener("mousedown", (ev) => { if (ev.target.closest("button")) ev.preventDefault(); }); // 단추를 눌러도 글의 선택이 풀리지 않게
-  for (const b of fmt.querySelectorAll("[data-cmd]")) b.onclick = () => { if (restoreSel()) { Editor.exec(b.dataset.cmd); changed(); fmtState(); } };
-  const fontSel = $("#f-font");
-  for (const f of Editor.FONTS) { const o = el("option", "", f); o.value = f; o.style.fontFamily = `"${f}"`; fontSel.append(o); }
-  fontSel.onchange = () => { applyMark("font", fontSel.value || "none"); fontSel.value = ""; };
-  const sizeSel = $("#f-size");
-  for (const z of Editor.FONT_SIZES) { const o = el("option", "", z); o.value = z; sizeSel.append(o); }
-  sizeSel.onchange = () => { applyMark("size", sizeSel.value || "none"); sizeSel.value = ""; };
-  $("#f-block").onchange = (ev) => setBlockType(ev.target.value);
+  const rail = $("#rail");
+  rail.addEventListener("mousedown", (ev) => { if (ev.target.closest("button")) ev.preventDefault(); }); // 단추를 눌러도 글의 선택이 풀리지 않게
+  for (const b of rail.querySelectorAll("[data-cmd]")) b.onclick = () => { closePops(); if (restoreSel()) { Editor.exec(b.dataset.cmd); changed(); fmtState(); } };
+  $("#f-block").onclick = () => {
+    const cur = $("#f-block .lb").textContent;
+    showPop("pop-block", BLOCK_TYPES, setBlockType, (BLOCK_TYPES.find(([, n]) => n === cur) || [])[0]);
+  };
+  $("#f-font").onclick = () => showPop("pop-font", [["none", "기본 글꼴"], ...Editor.FONTS.map((f) => [f, f])], (v) => applyMark("font", v));
+  $("#f-size").onclick = () => showPop("pop-size", [["none", "기본 크기", "11pt"], ...Editor.FONT_SIZES.map((z) => [z, z])], (v) => applyMark("size", v));
   drawPalette("pal-color", Editor.COLORS, "color");
   drawPalette("pal-bg", Editor.HILITES, "bg");
-  const togglePal = (id) => { const p = $("#" + id); const show = p.hidden; document.querySelectorAll(".pal").forEach((x) => (x.hidden = true)); p.hidden = !show; };
+  const togglePal = (id) => { const p = $("#" + id); const show = p.hidden; closePops(); if (show) placePop(p); };
   $("#f-color").onclick = () => togglePal("pal-color");
   $("#f-bg").onclick = () => togglePal("pal-bg");
-  document.addEventListener("click", (ev) => { if (!ev.target.closest(".pal-wrap")) document.querySelectorAll(".pal").forEach((x) => (x.hidden = true)); });
+  document.addEventListener("click", (ev) => { if (!ev.target.closest(".rb-wrap")) closePops(); });
   $("#f-task").onclick = toggleTaskBlock;
   $("#f-table").onclick = insertTable;
   for (const op of ["row-add", "col-add", "row-del", "col-del"]) $("#f-" + op).onclick = () => tableOp(op);
@@ -1143,77 +1117,8 @@ function toggleRaw() {
   $("#doc").hidden = state.raw;
   $("#mode-rich").classList.toggle("on", !state.raw);
   $("#mode-raw").classList.toggle("on", state.raw);
-  $("#fmt").hidden = state.raw;
+  $("#rail").classList.toggle("off", state.raw);
   if (state.raw) autosize($("#raw"));
-}
-
-/* ---------------- 페이지 만들기·이름 바꾸기·지우기 ---------------- */
-
-const SAFE_NAME = /^[^\\/:*?"<>|\u0000-\u001f]+$/;
-
-function currentFolder() {
-  return state.path && state.path.includes("/") ? state.path.split("/").slice(0, -1).join("/") + "/" : "";
-}
-
-async function newPage() {
-  if (!state.store || state.store.kind === "single") return newDocument();
-  const title = prompt("새 페이지 이름", "새 페이지");
-  if (!title) return;
-  const name = title.trim().replace(/\.md$/i, "");
-  if (!SAFE_NAME.test(name) || name === "." || name === "..") return status("파일 이름에 쓸 수 없는 글자가 있습니다.", "error");
-  const path = currentFolder() + name + ".md";
-  if (state.entries.some((e) => e.path === path)) return status("같은 이름의 페이지가 있습니다.", "error");
-  if (!(await flush())) return;
-  await state.store.write(path, `# ${name}\n\n`);
-  if (state.store.kind !== "single") await refreshTree();
-  await openFile(path);
-  editBlock(state.blocks.length > 1 ? 1 : 0);
-}
-
-async function newFolder() {
-  const name = prompt("새 폴더 이름");
-  if (!name) return;
-  if (!SAFE_NAME.test(name.trim())) return status("폴더 이름에 쓸 수 없는 글자가 있습니다.", "error");
-  try {
-    await state.store.mkdir(currentFolder() + name.trim());
-    await refreshTree();
-  } catch (e) {
-    status(e.message, "error");
-  }
-}
-
-async function renamePage() {
-  if (!state.path) return;
-  const old = state.path.split("/").pop().replace(MD_EXT, "");
-  const name = prompt("새 이름", old);
-  if (!name || name === old) return;
-  if (!SAFE_NAME.test(name.trim())) return status("파일 이름에 쓸 수 없는 글자가 있습니다.", "error");
-  if (!(await flush())) return;
-  const to = currentFolder() + name.trim().replace(/\.md$/i, "") + ".md";
-  try {
-    await state.store.rename(state.path, to);
-    state.cache.delete(state.path);
-    state.path = null;
-    await refreshTree();
-    await openFile(to);
-  } catch (e) {
-    status("이름을 바꾸지 못했습니다: " + e.message, "error");
-  }
-}
-
-async function deletePage() {
-  if (!state.path || !confirm(`"${state.path}" 페이지를 지울까요? 되돌릴 수 없습니다.`)) return;
-  try {
-    await state.store.remove(state.path);
-    state.cache.delete(state.path);
-    state.path = null;
-    state.dirty = false;
-    $("#page").hidden = true;
-    $("#empty-state").hidden = false;
-    await refreshTree();
-  } catch (e) {
-    status("지우지 못했습니다: " + e.message, "error");
-  }
 }
 
 /* ---------------- 내보내기: 한글(hwpx)·PDF·인쇄 ---------------- */
@@ -1241,11 +1146,6 @@ async function imageBytes(src) {
   if (state.store.imageBytes) return state.store.imageBytes(rel);
   const url = await state.store.imageUrl(rel);
   return url.startsWith("data:") ? b64ToBytes(url.split(",")[1]) : null;
-}
-
-function docName() {
-  if (state.path) return state.path.split("/").pop().replace(MD_EXT, "");
-  return (MD.titleOf(docText()) || "새 문서").replace(/[\\/:*?"<>|]/g, " ").trim().slice(0, 60) || "새 문서";
 }
 
 async function saveBytes(bytes, name, ext) {
@@ -1281,32 +1181,24 @@ function printDoc(pdfHint) {
 /* ---------------- 파일 메뉴 (한글·워드처럼) ---------------- */
 
 async function newDocument() {
-  if (!(await flushIfAny())) return;
-  if (!state.store) state.store = singleStore("새 문서.md", "");
-  state.path = null;
-  state.untitled = true;
-  state.dirty = false;
-  state.blocks = ["# 새 문서", ""];
-  showEditor();
-  setDocTitle("새 문서", "");
-  renderDoc();
-  renderTree();
-  status("저장하지 않은 새 문서");
+  await addTab({ store: singleStore("새 문서.md", ""), path: null, untitled: true, blocks: ["# 새 문서", ""] });
   editBlock(1);
 }
 
 async function saveAs() {
   commitEdit();
-  const name = (MD.titleOf(docText()) || "새 문서").replace(/[\\/:*?"<>|]/g, " ").trim().slice(0, 60) || "새 문서";
+  const name = docName();
   if (NATIVE) {
     try {
       const info = await window.nm_saveAs(name + ".md", docText());
       if (!info || !info.root) return false; // 취소
       state.store = nativeStore(info);
+      state.path = info.open;
       state.untitled = false;
       state.dirty = false;
-      await refreshTree();
-      await openFile(info.open);
+      state.imageCache = new Map();
+      renderTabs();
+      setDocTitle();
       status("저장됨", "ok");
       return true;
     } catch (e) {
@@ -1314,18 +1206,7 @@ async function saveAs() {
       return false;
     }
   }
-  if (state.store?.kind === "folder") {
-    const p = prompt("저장할 이름", name);
-    if (!p) return false;
-    const path = currentFolder() + p.trim().replace(/\.md$/i, "") + ".md";
-    await state.store.write(path, docText());
-    state.untitled = false;
-    state.dirty = false;
-    await refreshTree();
-    await openFile(path);
-    return true;
-  }
-  const a = el("a"); // 파일 하나 모드: 내려받기
+  const a = el("a"); // 브라우저: 내려받기
   a.href = URL.createObjectURL(new Blob([docText()], { type: "text/markdown;charset=utf-8" }));
   a.download = name + ".md";
   a.click();
@@ -1336,10 +1217,9 @@ async function saveAs() {
 
 async function openDialog() {
   if (!NATIVE) return openSingle();
-  if (!(await flushIfAny())) return;
   try {
     const info = await window.nm_openFile();
-    if (info && info.root) await useStore(nativeStore(info), info.open);
+    if (info && info.root) await openPath(nativeStore(info), info.open);
   } catch (e) {
     status("열지 못했습니다: " + e, "error");
   }
@@ -1352,64 +1232,7 @@ function toggleMenu(force) {
   $("#btn-file").classList.toggle("on", open);
 }
 
-function showEditor() {
-  $("#welcome").hidden = true;
-  $("#app").hidden = false;
-  $("#empty-state").hidden = true;
-  $("#page").hidden = false;
-}
-
 /* ---------------- 시작 ---------------- */
-
-async function useStore(store, openPath) {
-  if (!(await flushIfAny())) return;
-  state.store = store;
-  state.cache.clear();
-  state.imageCache.forEach((u) => URL.revokeObjectURL(u));
-  state.imageCache.clear();
-  state.path = null;
-  state.untitled = false;
-  $("#welcome").hidden = true;
-  $("#app").hidden = false;
-  $("#rootname").textContent = store.rootName || "";
-  $("#rootname").title = store.dir || store.rootName || "";
-  await refreshTree();
-  const first = openPath || state.entries.find((e) => !e.dir && /(^|\/)(readme|index)\.md$/i.test(e.path))?.path || state.entries.find((e) => !e.dir)?.path;
-  if (first) await openFile(first);
-  else {
-    $("#page").hidden = true;
-    $("#empty-state").hidden = false;
-  }
-  warmSearch();
-}
-
-async function flushIfAny() {
-  return state.store ? flush() : true;
-}
-
-async function pickFolder() {
-  if (NATIVE) {
-    if (!(await flushIfAny())) return;
-    try {
-      const info = await window.nm_openFolder();
-      if (info && info.root) await useStore(nativeStore(info));
-    } catch (e) {
-      status("폴더를 열지 못했습니다: " + e, "error");
-    }
-    return;
-  }
-  if (!window.showDirectoryPicker) {
-    alert("이 브라우저는 폴더 열기를 지원하지 않습니다. Edge나 Chrome으로 여시거나, '파일 하나 열기'를 쓰세요.");
-    return;
-  }
-  try {
-    const dir = await window.showDirectoryPicker({ id: "nongmak", mode: "readwrite" });
-    await rememberFolder(dir);
-    await useStore(folderStore(dir));
-  } catch (e) {
-    if (e.name !== "AbortError") status("폴더를 열지 못했습니다: " + e.message, "error");
-  }
-}
 
 function openSingle() {
   const input = el("input");
@@ -1418,37 +1241,9 @@ function openSingle() {
   input.onchange = async () => {
     const f = input.files[0];
     if (!f) return;
-    await useStore(singleStore(f.name, await f.text()), f.name);
+    await openPath(singleStore(f.name, await f.text()), f.name);
   };
   input.click();
-}
-
-// 최근 폴더 - 브라우저가 폴더 손잡이를 IndexedDB에 기억한다(이 PC·이 브라우저 안에만). 다시 열 때 권한을 한 번 묻는다.
-function idb() {
-  return new Promise((ok, fail) => {
-    const r = indexedDB.open("nongmak", 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("kv");
-    r.onsuccess = () => ok(r.result);
-    r.onerror = () => fail(r.error);
-  });
-}
-async function rememberFolder(dir) {
-  try {
-    const db = await idb();
-    db.transaction("kv", "readwrite").objectStore("kv").put(dir, "folder");
-  } catch { /* 기억 못 해도 된다 */ }
-}
-async function recallFolder() {
-  try {
-    const db = await idb();
-    return await new Promise((ok) => {
-      const r = db.transaction("kv").objectStore("kv").get("folder");
-      r.onsuccess = () => ok(r.result || null);
-      r.onerror = () => ok(null);
-    });
-  } catch {
-    return null;
-  }
 }
 
 function setZoom(z) {
@@ -1459,10 +1254,12 @@ function setZoom(z) {
 }
 
 function toggleSide(open) {
+  // 왼쪽 도구 막대: 접으면 아이콘만, 펴면 이름도
   const app = $("#app");
-  const show = open ?? app.classList.contains("side-closed");
-  app.classList.toggle("side-closed", !show);
-  try { localStorage.setItem("nongmak.side", show ? "1" : "0"); } catch { /* 무시 */ }
+  const show = open ?? !app.classList.contains("rail-open");
+  app.classList.toggle("rail-open", show);
+  $("#btn-side").classList.toggle("on", show);
+  try { localStorage.setItem("nongmak.rail", show ? "1" : "0"); } catch { /* 무시 */ }
 }
 
 function setTheme(theme) {
@@ -1476,28 +1273,21 @@ async function start() {
     const t = localStorage.getItem("nongmak.theme");
     if (t) document.documentElement.dataset.theme = t;
   } catch { /* 무시 */ }
-  $("#btn-folder").onclick = pickFolder;
-  $("#w-folder").onclick = pickFolder;
-  $("#w-file").onclick = openDialog;
-  $("#w-new").onclick = newDocument;
   $("#btn-file").onclick = (ev) => {
     ev.stopPropagation();
     toggleMenu();
   };
   document.addEventListener("click", () => toggleMenu(false));
   const menu = {
-    "m-new": newDocument, "m-open": openDialog, "m-folder": pickFolder,
+    "m-new": newDocument, "m-open": openDialog,
     "m-save": () => { state.dirty = true; save(); }, "m-saveas": saveAs,
     "m-hwpx": exportHwpx, "m-pdf": () => printDoc(true), "m-print": () => printDoc(false),
+    "m-close": () => closeTab(state.tab),
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
-  $("#btn-new").onclick = newPage;
-  $("#btn-newdir").onclick = newFolder;
-  $("#btn-rename").onclick = renamePage;
-  $("#btn-delete").onclick = deletePage;
+  $("#tab-add").onclick = newDocument;
   setupFmt();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
-  $("#search").oninput = () => renderTree();
   $("#raw").oninput = () => {
     autosize($("#raw"));
     changed();
@@ -1520,8 +1310,7 @@ async function start() {
   $("#zoom-out").onclick = () => setZoom(state.zoom - 0.1);
   $("#zoom-val").onclick = () => setZoom(1);
   $("#btn-side").onclick = () => toggleSide();
-  $("#btn-side-close").onclick = () => toggleSide(false);
-  try { if (localStorage.getItem("nongmak.side") === "0") toggleSide(false); } catch { /* 무시 */ }
+  try { if (localStorage.getItem("nongmak.rail") === "1") toggleSide(true); } catch { /* 무시 */ }
   document.addEventListener("keydown", (ev) => {
     if (!(ev.ctrlKey || ev.metaKey)) return;
     const k = ev.key.toLowerCase();
@@ -1537,6 +1326,12 @@ async function start() {
     } else if (k === "n") {
       ev.preventDefault();
       newDocument();
+    } else if (k === "w") {
+      ev.preventDefault();
+      closeTab(state.tab);
+    } else if (k === "tab" && state.tabs.length > 1) {
+      ev.preventDefault();
+      activate((state.tab + (ev.shiftKey ? -1 : 1) + state.tabs.length) % state.tabs.length);
     } else if (k === "p") {
       ev.preventDefault();
       printDoc(false);
@@ -1546,7 +1341,8 @@ async function start() {
     }
   });
   window.addEventListener("beforeunload", (ev) => {
-    if (state.dirty) {
+    snapshot();
+    if (state.tabs.some((t) => t.dirty && (t.untitled || t.store?.kind !== "native"))) {
       ev.preventDefault();
       ev.returnValue = "";
     }
@@ -1554,23 +1350,12 @@ async function start() {
 
   if (NATIVE) {
     const info = await window.nm_info();
-    if (info && info.root) {
-      await useStore(nativeStore(info), info.open || undefined);
+    if (info && info.root && info.open) {
+      await openPath(nativeStore(info), info.open);
       return;
     }
   }
-  $("#welcome").hidden = false;
-  if (NATIVE) $("#w-note").textContent = "마크다운(.md) 파일을 더블클릭해도 농막으로 열립니다. 이 프로그램은 인터넷에 연결하지 않습니다.";
-  else if (!window.showDirectoryPicker) $("#w-note").textContent = "이 브라우저는 폴더 열기를 지원하지 않습니다. 파일 하나 열기만 쓸 수 있습니다(Edge·Chrome 권장).";
-  const last = await recallFolder();
-  if (last) {
-    const btn = $("#w-last");
-    btn.hidden = false;
-    btn.textContent = `최근 폴더 다시 열기: ${last.name}`;
-    btn.onclick = async () => {
-      if ((await last.requestPermission({ mode: "readwrite" })) === "granted") await useStore(folderStore(last));
-    };
-  }
+  await newDocument(); // 메모장처럼 빈 새 문서로 시작한다
 }
 
 start();
