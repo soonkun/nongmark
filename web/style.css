@@ -29,6 +29,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .btn.ghost:hover { background: var(--hover); }
 .icon-btn { border: 0; background: none; border-radius: 6px; padding: 4px 9px; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .icon-btn:hover, .icon-btn.on { background: var(--hover); color: var(--ink); }
+#btn-pages { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; } #btn-pages.on { color: var(--green-d); background: var(--green-soft); }
 .link-btn { border: 0; background: none; color: var(--green); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 14px; }
 
 /* 편집 화면: 탭 줄 / 메뉴 줄 / (도구 막대 + 책상) / 상태 줄. 대문(.app.home)이면 탭 줄 아래가 대문 하나 */
@@ -133,7 +134,8 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .pagebreak span { position: relative; top: -.8em; background: var(--paper); color: var(--muted); font-size: 8.5pt; padding: 0 8px; }
 .raw-wrap { width: 210mm; margin: 0 auto; }
 .editors { position: relative; }
-.print-doc { position: absolute; left: -10000px; top: 0; width: 210mm; } /* 인쇄용 쪽은 화면 밖에서 그려 두었다가 인쇄할 때만 보인다 */
+.print-doc { position: absolute; left: -10000px; top: 0; width: 210mm; }
+.preview { cursor: zoom-in; } .preview .sheet { cursor: zoom-in; } /* 인쇄용 쪽은 화면 밖에서 그려 두었다가 인쇄할 때만 보인다 */
 .zoom { display: inline-flex; align-items: center; }
 .zoom .icon-btn { padding: 0 6px; font-size: 12px; }
 
@@ -214,7 +216,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 @page { size: A4; margin: 0; }
 @media print {
   html, body, .desk { background: #fff !important; height: auto; }
-  .tabs, .menubar, .rail, .statusbar, .block-add, .pagebreak span, .editors, .raw-wrap { display: none !important; }
+  .tabs, .menubar, .rail, .statusbar, .block-add, .pagebreak span, .editors, .raw-wrap, .preview { display: none !important; }
   .print-doc { position: static; width: auto; }
   .pagebreak { border: 0; }
   .app { display: block; } .body { display: block; } .desk { padding: 0; overflow: visible; }

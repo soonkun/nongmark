@@ -70,6 +70,7 @@ const state = {
   tab: -1,
   zoom: 1,
   raw: false,
+  pages: true, // 쪽 나눔 보기(끄면 내용 길이대로 이어지는 한 장)
 };
 const cur = () => state.tabs[state.tab];
 
@@ -114,6 +115,7 @@ async function addTab(doc, markdown) {
   $("#editors").append(t.host);
   t.ed = window.NMEditor.create(t.host, {
     markdown,
+    pages: state.pages,
     resolveImage: async (src) => {
       const img = MD.safeImage(src);
       if (!img) return "";
@@ -125,7 +127,7 @@ async function addTab(doc, markdown) {
     saveImage: (file) => storeImage(file, t),
   });
   t.ed.on("change", () => { if (t === cur()) changed(); });
-  t.ed.on("pages", (n) => { if (t === cur()) $("#pages").textContent = `${n}쪽`; });
+  t.ed.on("pages", (n) => { if (t === cur()) $("#pages").textContent = n ? `${n}쪽` : ""; });
   t.ed.on("state", () => { if (t === cur()) fmtState(); });
   t.host.addEventListener("click", (ev) => {
     const a = ev.target.closest("a[href]");
@@ -146,6 +148,7 @@ async function activate(j) {
   const t = cur();
   t.host.hidden = false;
   if (state.raw) $("#raw").value = t.ed.getMarkdown();
+  if (state.zoom <= PREVIEW_ZOOM) await setZoom(state.zoom);
   renderTabs();
   setDocTitle();
   countChars();
@@ -585,8 +588,7 @@ function splitBlock(wrap, sheetBody, limit) {
   return cont;
 }
 
-async function buildPrintDoc(md, t) {
-  const doc = $("#print-doc");
+async function buildPrintDoc(md, t, doc = $("#print-doc")) {
   doc.textContent = "";
   const blocks = MD.splitBlocks(md).map((b, i) => printBlock(b, i));
   // 그림을 먼저 넣는다(높이를 재야 하니까)
@@ -788,11 +790,39 @@ function setupTitlebar() {
 
 /* ---------------- 보기 ---------------- */
 
-function setZoom(z) {
+// 60% 이하로 줄이면 쪽을 나란히 놓는 미리보기(읽기 전용)로 바뀐다 - 편집기는 한 흐름이라 쪽을 옆으로 세울 수 없어서,
+// 인쇄에 쓰는 쪽 그리기(표는 줄 단위로 잘림)로 보여 준다. 쪽을 누르면 100%로 돌아와 다시 고친다.
+const PREVIEW_ZOOM = 0.6;
+
+async function setZoom(z) {
   state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 10) / 10;
   $("#editors").style.zoom = state.zoom;
   $("#raw-wrap").style.zoom = state.zoom;
+  $("#preview").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
+  const preview = state.zoom <= PREVIEW_ZOOM && !state.raw && state.pages && cur();
+  if (preview) {
+    const t = cur();
+    if (state.previewFor !== t || state.previewText !== docText()) {
+      state.previewFor = t;
+      state.previewText = docText();
+      await buildPrintDoc(state.previewText, t, $("#preview"));
+    }
+    status("쪽 미리보기(읽기 전용) · 쪽을 누르거나 Ctrl+0을 누르면 편집으로 돌아갑니다");
+  } else state.previewFor = null;
+  $("#preview").hidden = !preview;
+  $("#editors").hidden = !!preview || state.raw;
+  $("#rail").classList.toggle("off", !!preview || state.raw);
+  if (!preview && cur()) setDocTitle(), fmtState();
+}
+
+function setPages(on) {
+  state.pages = on;
+  $("#btn-pages").classList.toggle("on", on);
+  $("#btn-pages").title = on ? "쪽 나눔 보기 끄기(이어지는 한 장으로)" : "쪽 나눔 보기 켜기(A4 쪽으로)";
+  for (const t of state.tabs) t.ed.setPages(on);
+  try { localStorage.setItem("nongmak.pages", on ? "1" : "0"); } catch { /* 무시 */ }
+  setZoom(state.zoom);
 }
 
 function toggleSide(open) {
@@ -835,6 +865,8 @@ async function start() {
   setupTitlebar();
   setupRail();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  $("#btn-pages").onclick = () => setPages(!state.pages);
+  try { if (localStorage.getItem("nongmak.pages") === "0") { state.pages = false; $("#btn-pages").classList.remove("on"); $("#btn-pages").title = "쪽 나눔 보기 켜기(A4 쪽으로)"; } } catch { /* 무시 */ }
   $("#raw").oninput = () => {
     autosize($("#raw"));
     changed();
@@ -845,6 +877,7 @@ async function start() {
     ev.preventDefault();
     setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
+  $("#preview").addEventListener("click", () => { setZoom(1); cur()?.ed.focus(); });
   $("#zoom-in").onclick = () => setZoom(state.zoom + 0.1);
   $("#zoom-out").onclick = () => setZoom(state.zoom - 0.1);
   $("#zoom-val").onclick = () => setZoom(1);

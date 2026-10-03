@@ -179,13 +179,22 @@ function gapWidget(remaining, pageNo) {
 export const Pages = Extension.create({
   name: "pages",
   addOptions() { return { onPages: null, enabled: true }; },
+  addStorage() { return { enabled: true }; }, // 켜고 끄기는 storage로(editor.storage.pages.enabled) - 플러그인이 매번 읽는다
+  onCreate() { this.storage.enabled = this.options.enabled; },
   addProseMirrorPlugins() {
     const ext = this;
     let scheduled = 0;
     let lastSig = "";
     const measure = (view) => {
       scheduled = 0;
-      if (!ext.options.enabled || !view.dom.isConnected) return;
+      if (!view.dom.isConnected) return;
+      const sheetEl = view.dom.closest(".nm-sheet");
+      if (!ext.storage.enabled) { // 쪽 나눔 끔: 경계를 지우고 쪽을 내용 길이대로
+        if (sheetEl) sheetEl.style.paddingBottom = "";
+        if (lastSig !== "off") { lastSig = "off"; view.dispatch(view.state.tr.setMeta(pagesKey, [])); }
+        if (ext.options.onPages) ext.options.onPages(0);
+        return;
+      }
       const doc = view.state.doc;
       const breaks = []; // [pos, remaining, pageNo]
       let y = 0, page = 1, force = false;

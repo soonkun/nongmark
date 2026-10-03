@@ -200,7 +200,7 @@ function bubble(editor, host) {
 /* ---------------- 편집기 만들기 ---------------- */
 
 function create(container, opts = {}) {
-  const sheet = el("div", "nm-sheet");
+  const sheet = el("div", "nm-sheet" + (opts.pages === false ? " flow" : ""));
   container.append(sheet);
   const imageCache = new Map(); // 상대 경로 → data: 주소
   const ctx = {
@@ -244,7 +244,7 @@ function create(container, opts = {}) {
         render: () => { const h = el("div", "nm-handle"); h.title = "끌어서 옮기기 · Alt+↑↓"; h.textContent = "⋮⋮"; return h; },
       }),
       slashExtension(ctx),
-      Pages.configure({ onPages: (n) => emit("pages", n) }),
+      Pages.configure({ onPages: (n) => emit("pages", n), enabled: opts.pages !== false }),
     ],
     content: docFromMd(""),
     onUpdate: () => emit("change"),
@@ -278,6 +278,12 @@ function create(container, opts = {}) {
     destroy: () => { bb.destroy(); editor.destroy(); sheet.remove(); },
     on: (name, fn) => listeners[name].push(fn),
     pickImage: ctx.pickImage,
+    /** 쪽 나눔 보기 켜고 끄기 */
+    setPages(on) {
+      editor.storage.pages.enabled = !!on;
+      sheet.classList.toggle("flow", !on);
+      editor.view.dispatch(editor.state.tr.setMeta("nm-pages-refresh", true));
+    },
     /** 도구 막대가 쓰는 명령 */
     cmd(name, value) {
       const c = editor.chain().focus();

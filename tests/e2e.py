@@ -119,11 +119,22 @@ with sync_playwright() as p:
     w = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-sheet').getBoundingClientRect().width")
     print("긴 문서: 쪽 경계", gaps, "| 쪽 폭 px:", round(w))
     assert gaps >= 2 and abs(w - 793.7) < 3
-    # 확대·축소
+    # 확대·축소: 60% 이하로 줄이면 쪽이 나란히 놓인 미리보기, 쪽을 누르면 편집으로
     page.mouse.move(700, 400)
-    for _ in range(3): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.05)
-    print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "70%"
-    page.click("#zoom-val")
+    for _ in range(5): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.1)
+    time.sleep(0.6); print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "50%"
+    assert not page.is_hidden("#preview") and page.is_hidden("#editors")
+    tops = page.evaluate("[...document.querySelectorAll('#preview .sheet')].slice(0,2).map(s => Math.round(s.getBoundingClientRect().top))")
+    print("미리보기 첫 두 쪽 위치:", tops, "| 쪽 수:", page.locator("#preview .sheet").count()); assert tops[0] == tops[1]
+    page.screenshot(path=str(ROOT / "build" / "two-pages.png"))
+    page.click("#preview .sheet >> nth=0"); time.sleep(0.3)
+    assert page.inner_text("#zoom-val") == "100%" and page.is_hidden("#preview") and not page.is_hidden("#editors")
+    # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
+    page.click("#btn-pages"); time.sleep(0.5)
+    print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmak.pages')"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() == 0 and page.inner_text("#pages") == "" and page.evaluate("localStorage.getItem('nongmak.pages')") == "0"
+    page.click("#btn-pages"); time.sleep(0.5)
+    assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() >= 2
     # 한글로 내보내기
     page.click("#btn-file"); page.click("#m-hwpx"); time.sleep(1.5)
     exp = page.evaluate("window.__export")

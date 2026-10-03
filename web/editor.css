@@ -1,6 +1,7 @@
 /* 편집기(ProseMirror) 모양. 쪽은 A4 210×297mm, 여백 좌우 20mm·위아래 30mm, 본문 11pt·160%(한글 내보내기와 같다). */
 .nm-desk { position: relative; width: 210mm; margin: 0 auto; }
 .nm-sheet { position: relative; width: 210mm; min-height: 297mm; padding: 30mm 20mm; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.nm-sheet.flow { min-height: 0; } .nm-sheet.flow .nm-pm { min-height: 60vh; } /* 쪽 나눔 끔: 내용 길이대로 이어지는 한 장 */
 .nm-pm { outline: none; min-height: 237mm; font-size: 11pt; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; color: var(--ink); }
 .nm-pm > * + * { margin-top: 0; }
 .nm-pm p { margin: 5px 0; min-height: 1.6em; }

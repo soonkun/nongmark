@@ -54,6 +54,7 @@
       </div>
     </div>
     <span id="docpath" class="docpath"></span>
+    <button id="btn-pages" class="icon-btn on" title="쪽 나눔 보기 끄기(이어지는 한 장으로)"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="1.5" width="10" height="5.5" rx="1"/><rect x="3" y="9" width="10" height="5.5" rx="1"/></svg> 쪽</button>
     <span class="mode" role="group" aria-label="편집 모드"><button id="mode-rich" class="on" title="서식 도구로 고치기(노션처럼)">편집기</button><button id="mode-raw" title="문서 전체를 마크다운 원문으로 보기·고치기">원문</button></span>
     <button id="btn-theme" class="icon-btn" title="밝게 / 어둡게">어둡게</button>
   </div>
@@ -112,6 +113,7 @@
     <div class="desk">
       <div id="editors" class="editors"></div>
       <div id="raw-wrap" class="raw-wrap" hidden><textarea id="raw" class="raw" spellcheck="false"></textarea></div>
+      <div id="preview" class="doc pages preview" hidden title="쪽을 누르면 편집으로 돌아갑니다"></div>
       <div id="print-doc" class="doc pages print-doc" hidden></div>
     </div>
   </div>
