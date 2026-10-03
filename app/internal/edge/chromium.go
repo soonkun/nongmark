@@ -3,7 +3,6 @@
 package edge
 
 import (
-	"strings"
 	"log"
 	"os"
 	"path/filepath"
@@ -249,13 +248,10 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 // isOurPage: 우리가 SetHtml(NavigateToString)로 넣는 화면인가. 런타임 판에 따라 about:blank 또는 data:text/html 주소로 보고된다.
 // 화면이 한 번 다 뜨고 나면(pageSource 기록) 그 주소와 about:blank만 인정한다 - 이후에는 어떤 data:·about: 주소로도 못 간다.
 func (e *Chromium) isOurPage(uri string) bool {
-	if uri == "" || uri == "about:blank" {
-		return true
+	if e.pageSource == "" {
+		return true // 첫 화면(SetHtml)이 뜨기 전에는 막지 않는다 - 런타임마다 첫 이동의 주소 표기가 달라 비교할 수 없다
 	}
-	if e.pageSource != "" {
-		return uri == e.pageSource
-	}
-	return strings.HasPrefix(uri, "data:text/html") // 첫 화면이 뜨기 전, SetHtml 자신의 이동
+	return uri == "about:blank" || uri == e.pageSource
 }
 
 // NavigationStarting: 우리 화면 말고 다른 곳(http·https·file·ftp…)으로 가는 이동은 취소한다 - 문서 안 링크 클릭·드롭한 파일 등.
