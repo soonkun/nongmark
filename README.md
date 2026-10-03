@@ -84,3 +84,6 @@ node tests/hwpx.test.cjs build/sample.hwpx && ../news-briefing/.venv/bin/python 
 한글 문서 골격(`assets/hwpx-template`)은 python-hwpx(Apache-2.0)의 빈 문서에서 땄다.
 도구: Go 1.27.1(go.dev 공식, SHA-256 대조), `binutils-mingw-w64`의 windres(Ubuntu), NSIS 3.09(Ubuntu `nsis`), 아이콘은 `make_icon.py`(Pillow).
 **아직 실제 Windows에서 돌려 보지 못했다** — 이 개발 서버에는 Windows가 없다. 첫 설치 때 창이 뜨는지, .md 더블클릭·저장이 되는지 확인이 필요하다.
+
+## 라이선스
+Apache License 2.0 (`LICENSE`). 들어간 제3자 소프트웨어와 그 라이선스는 `NOTICE`에 적혀 있다.

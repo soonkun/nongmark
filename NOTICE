@@ -1,0 +1,12 @@
+새싹이의 농막 (nongmark)
+Copyright 2026 농촌진흥청 (Rural Development Administration, Republic of Korea)
+
+이 소프트웨어는 Apache License 2.0으로 배포됩니다(LICENSE 파일).
+
+들어간 제3자 소프트웨어:
+- go-webview2 (app/internal/edge, loader, webview, w32) - MIT License, https://github.com/jchv/go-webview2 (소스를 들여와 수정함)
+- go-ole의 GUID 코드 (app/internal/edge/guid.go) - MIT License, Copyright 2013-2017 Yasuhiro Matsumoto
+- Tiptap / ProseMirror 및 의존 패키지 (web/editor-app, 묶음으로 nongmark.html에 포함) - MIT License, https://tiptap.dev, https://prosemirror.net
+- Microsoft Edge WebView2Loader.dll (vendor-bin, 설치 프로그램에 포함) - Microsoft Software License Terms (WebView2 SDK 재배포 허용)
+- python-hwpx의 빈 문서 골격 (assets/hwpx-template) - Apache License 2.0
+- NSIS (설치 프로그램 생성 도구) - zlib/libpng License
