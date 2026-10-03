@@ -1,4 +1,4 @@
-1 ICON "../assets/nongmak.ico"
+1 ICON "../assets/nongmark.ico"
 1 VERSIONINFO
 FILEVERSION 1,0,0,0
 PRODUCTVERSION 1,0,0,0
@@ -12,8 +12,8 @@ BEGIN
       VALUE "CompanyName", "농촌진흥청"
       VALUE "FileDescription", "새싹이의 농막 - 마크다운 편집기"
       VALUE "FileVersion", "1.0.0"
-      VALUE "InternalName", "nongmak"
-      VALUE "OriginalFilename", "nongmak.exe"
+      VALUE "InternalName", "nongmark"
+      VALUE "OriginalFilename", "nongmark.exe"
       VALUE "ProductName", "새싹이의 농막"
       VALUE "ProductVersion", "1.0.0"
     END

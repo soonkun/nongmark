@@ -11,10 +11,10 @@ import (
 	"sync"
 	"unsafe"
 
-	"nongmak/internal/edge"
-	"nongmak/internal/w32"
+	"nongmark/internal/edge"
+	"nongmark/internal/w32"
 
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 var (

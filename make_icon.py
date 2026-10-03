@@ -1,4 +1,4 @@
-"""아이콘 만들기: assets/icon-source.png(소유자가 준 그림, 10-03 두 번째 아이콘: 초록 바탕에 M↓와 새싹이) → 바깥 흰 배경을 투명하게 → nongmak.ico(16~256) + 화면용 PNG.
+"""아이콘 만들기: assets/icon-source.png(소유자가 준 그림, 10-03 두 번째 아이콘: 초록 바탕에 M↓와 새싹이) → 바깥 흰 배경을 투명하게 → nongmark.ico(16~256) + 화면용 PNG.
 빌드 때 한 번(Pillow 필요, 개발 서버에서만)."""
 import sys
 from collections import deque
@@ -27,7 +27,7 @@ side = max(art.size)
 square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
 square.paste(art, ((side - art.width) // 2, (side - art.height) // 2))
 out = ROOT / "assets"
-square.resize((256, 256), Image.LANCZOS).save(out / "nongmak.ico", sizes=[(s, s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)])
+square.resize((256, 256), Image.LANCZOS).save(out / "nongmark.ico", sizes=[(s, s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)])
 square.resize((64, 64), Image.LANCZOS).save(out / "icon-64.png", optimize=True)
 square.resize((192, 192), Image.LANCZOS).save(out / "icon-192.png", optimize=True)
-print("ok", square.size, (out / "nongmak.ico").stat().st_size, "bytes")
+print("ok", square.size, (out / "nongmark.ico").stat().st_size, "bytes")

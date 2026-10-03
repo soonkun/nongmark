@@ -3,8 +3,8 @@
 package main
 
 // 설치·해제 - 관리자 권한 없이 "현재 사용자"에게만 적용한다(HKEY_CURRENT_USER, %LOCALAPPDATA%).
-//   nongmak.exe --install   : 자신을 %LOCALAPPDATA%\Programs\Nongmak\ 에 복사하고 .md/.markdown 연결을 등록한다.
-//   nongmak.exe --uninstall : 등록을 지운다(설치 폴더는 안내만 - 실행 중인 자신은 지울 수 없다).
+//   nongmark.exe --install   : 자신을 %LOCALAPPDATA%\Programs\Nongmark\ 에 복사하고 .md/.markdown 연결을 등록한다.
+//   nongmark.exe --uninstall : 등록을 지운다(설치 폴더는 안내만 - 실행 중인 자신은 지울 수 없다).
 // 레지스트리는 advapi32.dll의 함수만 직접 부른다(외부 라이브러리 없음). 건드리는 키는 아래 classesKeys가 전부다.
 
 import (
@@ -20,8 +20,8 @@ const (
 	hkcu         = 0x80000001
 	keyAllAccess = 0xF003F
 	regSZ        = 1
-	progID       = "Nongmak.Markdown"
-	appExe       = "nongmak.exe"
+	progID       = "Nongmark.Markdown"
+	appExe       = "nongmark.exe"
 	shcneAssoc   = 0x08000000
 )
 
@@ -86,13 +86,19 @@ func deleteValue(path, name string) {
 }
 
 func installDir() string {
-	return filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "Nongmak")
+	return filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "Nongmark")
 }
 
 func install() error {
 	if os.Getenv("LOCALAPPDATA") == "" {
 		return errors.New("LOCALAPPDATA를 찾지 못했습니다")
 	}
+	// 옛 이름(Nongmak)의 연결 등록이 남아 있으면 먼저 지운다(설치 폴더 Programs\Nongmak은 사용자가 지운다)
+	for _, ext := range []string{".md", ".markdown"} {
+		deleteValue(`Software\Classes\`+ext+`\OpenWithProgids`, "Nongmak.Markdown")
+	}
+	deleteTree(`Software\Classes\Nongmak.Markdown`)
+	deleteTree(`Software\Classes\Applications\nongmak.exe`)
 	self, err := os.Executable()
 	if err != nil {
 		return err
@@ -144,14 +150,18 @@ func install() error {
 }
 
 func uninstall() error {
-	for _, ext := range []string{".md", ".markdown"} {
-		deleteValue(`Software\Classes\`+ext+`\OpenWithProgids`, progID)
-		if getDefault(`Software\Classes\`+ext) == progID {
-			deleteValue(`Software\Classes\`+ext, "")
+	// 옛 이름(Nongmak.Markdown, nongmak.exe)으로 등록된 것도 함께 지운다 - 이름을 nongmark로 바꾸기 전 설치분
+	for _, id := range []string{progID, "Nongmak.Markdown"} {
+		for _, ext := range []string{".md", ".markdown"} {
+			deleteValue(`Software\Classes\`+ext+`\OpenWithProgids`, id)
+			if getDefault(`Software\Classes\`+ext) == id {
+				deleteValue(`Software\Classes\`+ext, "")
+			}
 		}
+		deleteTree(`Software\Classes\` + id)
 	}
-	deleteTree(`Software\Classes\` + progID)
 	deleteTree(`Software\Classes\Applications\` + appExe)
+	deleteTree(`Software\Classes\Applications\nongmak.exe`)
 	shChangeNotify.Call(shcneAssoc, 0, 0, 0)
 	return nil
 }

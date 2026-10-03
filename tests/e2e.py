@@ -1,4 +1,4 @@
-"""화면 시험: nongmak.html을 Chromium에서 연다. 프로그램(nongmak.exe)이 넣어 주는 nm_* 함수를 메모리 가짜로 대신 넣어
+"""화면 시험: nongmark.html을 Chromium에서 연다. 프로그램(nongmark.exe)이 넣어 주는 nm_* 함수를 메모리 가짜로 대신 넣어
 '창 안' 모드를 그대로 돌린다. 바깥 요청 0건, CSP 위반 0건, 열기·고치기·저장·새 문서·다른 이름 저장·링크·탭·서식 편집·쪽 나눔을 본다.
 실행: ../.tools/pw/bin/python tests/e2e.py"""
 import json, time
@@ -39,7 +39,7 @@ with sync_playwright() as p:
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("dialog", lambda d: d.accept("새 페이지"))
-    page.goto("file://" + str(ROOT / "dist" / "nongmak.html"))
+    page.goto("file://" + str(ROOT / "dist" / "nongmark.html"))
     page.wait_for_selector(".nm-pm h1")
     files = lambda: page.evaluate("window.__files")
     open_doc = lambda name: (page.evaluate(f"window.__openNext = {json.dumps(name)}"), page.click("#btn-file"), page.click("#m-open"), page.wait_for_selector(f".tab.on:has-text('{name.replace('.md', '')}')"), time.sleep(0.6))
@@ -119,11 +119,18 @@ with sync_playwright() as p:
     w = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-sheet').getBoundingClientRect().width")
     print("긴 문서: 쪽 경계", gaps, "| 쪽 폭 px:", round(w))
     assert gaps >= 2 and abs(w - 793.7) < 3
-    # 확대·축소: 60% 이하로 줄이면 쪽이 나란히 놓인 미리보기, 쪽을 누르면 편집으로
+    # 확대·축소: 책상 폭(창 - 도구 막대)에 두 쪽이 들어갈 만큼 줄이면 나란히 미리보기, 쪽을 누르면 편집으로
+    # 1280px 창, 도구 막대 접힘 48px → 80%(1293px 필요)는 안 들어가고 70%(1131px)부터 들어간다
     page.mouse.move(700, 400)
-    for _ in range(5): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.1)
-    time.sleep(0.6); print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "50%"
+    for _ in range(2): page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.1)
+    time.sleep(0.4); assert page.inner_text("#zoom-val") == "80%" and page.is_hidden("#preview"), "80%: 두 쪽이 안 들어가 편집 유지"
+    page.keyboard.down("Control"); page.mouse.wheel(0, 120); page.keyboard.up("Control"); time.sleep(0.6)
+    print("줌:", page.inner_text("#zoom-val")); assert page.inner_text("#zoom-val") == "70%"
     assert not page.is_hidden("#preview") and page.is_hidden("#editors")
+    page.click("#btn-side"); time.sleep(0.6)  # 도구 막대를 펼치면(184px) 70%로는 두 쪽이 안 들어가 편집으로 돌아온다
+    assert page.is_hidden("#preview") and not page.is_hidden("#editors"), "도구 막대 폭을 고려"
+    page.click("#btn-side"); time.sleep(0.6)
+    assert not page.is_hidden("#preview")
     tops = page.evaluate("[...document.querySelectorAll('#preview .sheet')].slice(0,2).map(s => Math.round(s.getBoundingClientRect().top))")
     print("미리보기 첫 두 쪽 위치:", tops, "| 쪽 수:", page.locator("#preview .sheet").count()); assert tops[0] == tops[1]
     page.screenshot(path=str(ROOT / "build" / "two-pages.png"))
@@ -147,7 +154,7 @@ with sync_playwright() as p:  # 가짜 없이 = 브라우저에서 html만 연 �
     b = p.chromium.launch(); page = b.new_page(viewport={"width": 1280, "height": 820})
     page.on("request", lambda r: None if r.url.startswith(("file:", "data:", "blob:")) else outside.append(r.url))
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-    page.goto("file://" + str(ROOT / "dist" / "nongmak.html")); page.wait_for_selector("#welcome:not([hidden])")
+    page.goto("file://" + str(ROOT / "dist" / "nongmark.html")); page.wait_for_selector("#welcome:not([hidden])")
     page.screenshot(path=str(ROOT / "build" / "welcome.png"))
     page.click("#w-new"); page.wait_for_selector(".tab.on:has-text('새 문서')"); assert page.is_hidden("#welcome")
     page.keyboard.press("Control+w"); page.wait_for_selector("#welcome:not([hidden])")  # 다 닫으면 대문

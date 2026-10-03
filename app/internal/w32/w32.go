@@ -7,7 +7,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 var (

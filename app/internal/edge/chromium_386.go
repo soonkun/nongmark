@@ -3,7 +3,7 @@
 package edge
 
 import (
-	"nongmak/internal/w32"
+	"nongmark/internal/w32"
 	"unsafe"
 )
 

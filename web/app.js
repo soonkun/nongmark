@@ -1,8 +1,8 @@
 // 새싹이의 농막 화면. 메모장·한글처럼 문서를 탭으로 열고(폴더 보기 없음), 본문은 편집기(NMEditor, ProseMirror)가 맡는다.
 // 파일은 언제나 마크다운(.md). 편집기 ⇄ 마크다운 변환은 편집기 묶음(web/editor-app)이 한다.
 // 저장소는 둘 중 하나 - 같은 함수 모양(read/write/saveAsset/imageUrl)을 갖는다:
-//   native : nongmak.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음). 문서가 든 폴더(dir)가 열쇠.
-//   single : 브라우저에서 nongmak.html을 연 경우 - 파일 하나를 열고 내려받기로 저장.
+//   native : nongmark.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음). 문서가 든 폴더(dir)가 열쇠.
+//   single : 브라우저에서 nongmark.html을 연 경우 - 파일 하나를 열고 내려받기로 저장.
 // 네트워크: 이 코드는 어디에도 연결하지 않는다. 페이지의 CSP가 connect-src 'none'으로 막는다.
 
 "use strict";
@@ -57,7 +57,7 @@ function singleStore(name, text) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     },
-    async saveAsset() { throw new Error("그림 넣기는 프로그램 창(nongmak.exe)에서 쓸 수 있습니다."); },
+    async saveAsset() { throw new Error("그림 넣기는 프로그램 창(nongmark.exe)에서 쓸 수 있습니다."); },
     async imageUrl() { throw new Error("no folder"); },
   };
 }
@@ -148,7 +148,7 @@ async function activate(j) {
   const t = cur();
   t.host.hidden = false;
   if (state.raw) $("#raw").value = t.ed.getMarkdown();
-  if (state.zoom <= PREVIEW_ZOOM) await setZoom(state.zoom);
+  if (state.zoom < 1) await setZoom(state.zoom);
   renderTabs();
   setDocTitle();
   countChars();
@@ -790,9 +790,13 @@ function setupTitlebar() {
 
 /* ---------------- 보기 ---------------- */
 
-// 60% 이하로 줄이면 쪽을 나란히 놓는 미리보기(읽기 전용)로 바뀐다 - 편집기는 한 흐름이라 쪽을 옆으로 세울 수 없어서,
-// 인쇄에 쓰는 쪽 그리기(표는 줄 단위로 잘림)로 보여 준다. 쪽을 누르면 100%로 돌아와 다시 고친다.
-const PREVIEW_ZOOM = 0.6;
+// 책상 폭에 쪽 두 장이 들어갈 만큼 줄이면(폭 맞춤) 쪽을 나란히 놓는 미리보기(읽기 전용)로 바뀐다 - 편집기는 한 흐름이라
+// 쪽을 옆으로 세울 수 없어서, 인쇄에 쓰는 쪽 그리기(표는 줄 단위로 잘림)로 보여 준다. 쪽을 누르면 100%로 돌아와 다시 고친다.
+const SHEET_PX = 794 + 2; // 210mm + 테두리
+function fitsTwo() {
+  // 책상(.desk) 폭 = 창 폭에서 왼쪽 도구 막대(접힘 48px·펼침 184px)를 뺀 것. 좌우 여백 20px씩을 빼고 쪽 두 장 + 사이 24px이 들어가면 다단
+  return $(".desk").clientWidth - 40 >= (2 * SHEET_PX + 24) * state.zoom;
+}
 
 async function setZoom(z) {
   state.zoom = Math.round(Math.min(2, Math.max(0.3, z)) * 10) / 10;
@@ -800,7 +804,7 @@ async function setZoom(z) {
   $("#raw-wrap").style.zoom = state.zoom;
   $("#preview").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
-  const preview = state.zoom <= PREVIEW_ZOOM && !state.raw && state.pages && cur();
+  const preview = state.zoom < 1 && fitsTwo() && !state.raw && state.pages && cur();
   if (preview) {
     const t = cur();
     if (state.previewFor !== t || state.previewText !== docText()) {
@@ -832,6 +836,7 @@ function toggleSide(open) {
   app.classList.toggle("rail-open", show);
   $("#btn-side").classList.toggle("on", show);
   try { localStorage.setItem("nongmak.rail", show ? "1" : "0"); } catch { /* 무시 */ }
+  if (state.zoom < 1) setTimeout(() => setZoom(state.zoom), 220); // 도구 막대 폭이 바뀌면(펼침 .2s 뒤) 두 쪽이 들어가는지 다시 본다
 }
 
 function setTheme(theme) {
@@ -878,6 +883,8 @@ async function start() {
     setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
   $("#preview").addEventListener("click", () => { setZoom(1); cur()?.ed.focus(); });
+  let resizeTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.zoom < 1) setZoom(state.zoom); }, 150); }); // 창 폭이 바뀌면 두 쪽이 들어가는지 다시 본다
   $("#zoom-in").onclick = () => setZoom(state.zoom + 0.1);
   $("#zoom-out").onclick = () => setZoom(state.zoom - 0.1);
   $("#zoom-val").onclick = () => setZoom(1);

@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"nongmak/internal/w32"
-	"nongmak/internal/windows"
+	"nongmark/internal/w32"
+	"nongmark/internal/windows"
 )
 
 type Chromium struct {

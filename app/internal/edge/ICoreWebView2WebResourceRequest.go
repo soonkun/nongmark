@@ -5,7 +5,7 @@ package edge
 import (
 	"unsafe"
 
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 type _ICoreWebView2WebResourceRequestVtbl struct {

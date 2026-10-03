@@ -5,7 +5,7 @@ package edge
 import (
 	"unsafe"
 
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 type iCoreWebView2_3Vtbl struct {

@@ -7,10 +7,10 @@ import (
 	"runtime"
 	"unsafe"
 
-	"nongmak/internal/w32"
+	"nongmark/internal/w32"
 
-	webviewloader "nongmak/internal/loader"
-	"nongmak/internal/windows"
+	webviewloader "nongmark/internal/loader"
+	"nongmark/internal/windows"
 )
 
 func init() {

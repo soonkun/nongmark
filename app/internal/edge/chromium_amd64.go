@@ -5,7 +5,7 @@ package edge
 import (
 	"unsafe"
 
-	"nongmak/internal/w32"
+	"nongmark/internal/w32"
 )
 
 func (e *Chromium) Resize() {

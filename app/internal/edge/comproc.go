@@ -3,7 +3,7 @@
 package edge
 
 import (
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 // ComProc stores a COM procedure.

@@ -5,7 +5,7 @@ package edge
 import (
 	"unsafe"
 
-	"nongmak/internal/windows"
+	"nongmark/internal/windows"
 )
 
 // ICoreWebviewSettings is the merged settings class

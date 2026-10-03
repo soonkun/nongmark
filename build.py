@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""새싹이의 농막 빌드 - web/의 세 파일을 한 장짜리 화면(nongmak.html)으로 묶고, Windows 10·11용 nongmak.exe를 만든다.
+"""새싹이의 농막 빌드 - web/의 세 파일을 한 장짜리 화면(nongmark.html)으로 묶고, Windows 10·11용 nongmark.exe를 만든다.
 
 빌드는 이 개발 서버에서만 한다(Python·Go·windres 필요). 내부망 PC에는 dist/의 결과물만 가져간다.
 묶을 때 하는 일:
@@ -109,9 +109,9 @@ def build_html() -> Path:
     html = html.replace("{{ICON64}}", data_uri("icon-64.png")).replace("{{WORDMARK}}", data_uri("wordmark.png"))
     assert "{{" not in html
     DIST.mkdir(exist_ok=True)
-    out = DIST / "nongmak.html"
+    out = DIST / "nongmark.html"
     out.write_text(html, encoding="utf-8", newline="\n")
-    shutil.copy(out, APP / "nongmak.html")  # exe 안에 넣는다(go:embed)
+    shutil.copy(out, APP / "nongmark.html")  # exe 안에 넣는다(go:embed)
     return out
 
 
@@ -125,12 +125,12 @@ def build_exe() -> list[Path]:
     rcpp = ROOT / "build" / "rcpp.sh"
     rcpp.write_text('#!/bin/sh\nfor a; do f="$a"; done\ncat "$f"\n')
     rcpp.chmod(0o755)
-    subprocess.run(["x86_64-w64-mingw32-windres", f"--preprocessor={rcpp}", "-c", "65001", "-O", "coff", "-o", "rsrc_windows_amd64.syso", "nongmak.rc"], cwd=APP, check=True)
+    subprocess.run(["x86_64-w64-mingw32-windres", f"--preprocessor={rcpp}", "-c", "65001", "-O", "coff", "-o", "rsrc_windows_amd64.syso", "nongmark.rc"], cwd=APP, check=True)
     subprocess.run([str(GO), "test", "./..."], cwd=APP, env=env, check=True)
     subprocess.run([str(GO), "vet", "."], cwd=APP, env=win, check=True)
     # 들여온 WebView2 래퍼의 Win32 핸들 변환(uintptr→unsafe.Pointer)은 Win32 API의 정상 쓰임이라 unsafeptr 검사만 끈다
     subprocess.run([str(GO), "vet", "-unsafeptr=false", "./internal/..."], cwd=APP, env=win, check=True)
-    exe = DIST / "nongmak.exe"
+    exe = DIST / "nongmark.exe"
     subprocess.run([str(GO), "build", "-trimpath", "-buildvcs=false", "-ldflags", "-s -w -buildid= -H=windowsgui", "-o", str(exe), "."], cwd=APP, env=win, check=True)
     if hashlib.sha256(LOADER_DLL.read_bytes()).hexdigest() != LOADER_SHA256:
         sys.exit("WebView2Loader.dll의 해시가 기록과 다릅니다 - 바뀐 파일을 넣지 않습니다")

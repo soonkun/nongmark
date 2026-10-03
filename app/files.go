@@ -228,7 +228,7 @@ func atomicWrite(root *os.Root, name string, data []byte) error {
 	if _, err := rand.Read(b); err != nil {
 		return err
 	}
-	tmp := filepath.Join(filepath.Dir(name), ".nongmak-"+hex.EncodeToString(b)+".tmp")
+	tmp := filepath.Join(filepath.Dir(name), ".nongmark-"+hex.EncodeToString(b)+".tmp")
 	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return err

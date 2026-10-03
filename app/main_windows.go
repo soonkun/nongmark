@@ -1,6 +1,6 @@
 //go:build windows
 
-// nongmak.exe - 새싹이의 농막. 한글·워드처럼 .md 파일을 더블클릭하면 이 프로그램 창에서 열린다.
+// nongmark.exe - 새싹이의 농막. 한글·워드처럼 .md 파일을 더블클릭하면 이 프로그램 창에서 열린다.
 //
 // 창 안의 화면은 Windows에 들어 있는 WebView2(Edge 엔진)로 그린다. 서버도 포트도 없다 - 화면과 이 프로그램은
 // 같은 프로세스 안에서 직접 함수를 주고받는다(WebView2의 postMessage). 이 프로그램에는 통신 패키지(net/http 등)가 없다.
@@ -16,11 +16,11 @@ import (
 	"strings"
 	"sync"
 
-	"nongmak/internal/loader"
-	"nongmak/internal/webview"
+	"nongmark/internal/loader"
+	"nongmark/internal/webview"
 )
 
-//go:embed nongmak.html
+//go:embed nongmark.html
 var page string
 
 func main() {
@@ -67,7 +67,7 @@ func main() {
 		}
 		first, _ = register(ws)
 	}
-	data := filepath.Join(os.Getenv("LOCALAPPDATA"), "Nongmak", "WebView2")
+	data := filepath.Join(os.Getenv("LOCALAPPDATA"), "Nongmark", "WebView2")
 	w := webview.NewWithOptions(webview.WebViewOptions{
 		Debug:     false,
 		AutoFocus: true,
