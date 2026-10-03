@@ -197,15 +197,27 @@ export const Pages = Extension.create({
       }
       const doc = view.state.doc;
       const breaks = []; // [pos, remaining, pageNo]
+      // 블록 높이는 '다음 형제의 시작 - 내 시작'으로 잰다(문단 사이 여백까지 포함 - offsetHeight만 더하면 여백만큼 쪽이 넘쳐 인쇄에서 쪽이 하나 더 생긴다).
+      // 쪽 경계 위젯은 형제로 끼어 있으므로 그 높이는 뺀다.
+      const kids = [...view.dom.children];
+      const extent = new Map();
+      for (let k = 0; k < kids.length; k++) {
+        const a = kids[k];
+        let next = kids[k + 1];
+        while (next && next.classList.contains("nm-pagegap")) next = kids[kids.indexOf(next) + 1];
+        const h = next ? next.offsetTop - a.offsetTop - (kids[k + 1] && kids[k + 1].classList.contains("nm-pagegap") ? kids[k + 1].offsetHeight : 0) : a.offsetHeight;
+        extent.set(a, Math.max(0, h));
+      }
+      const LIMIT = PAGE.contentH - 6; // 인쇄 엔진과의 반올림 차이 여유
       let y = 0, page = 1, force = false;
       doc.forEach((node, offset) => {
         const dom = view.nodeDOM(offset);
         if (!dom || !(dom instanceof HTMLElement)) return;
-        const h = dom.offsetHeight;
+        const h = extent.has(dom) ? extent.get(dom) : dom.offsetHeight;
         if (node.type.name === "pageBreak") { force = true; y += h; return; }
         // 한 쪽보다 긴 블록(긴 표)은 쪽 절반 넘게 찼을 때만 다음 쪽으로 보낸다 - 아니면 거의 빈 쪽이 남는다. 인쇄는 줄 단위로 자른다.
-        const tall = h > PAGE.contentH && y < PAGE.contentH / 2;
-        if (y > 0 && (force || (y + h > PAGE.contentH && !tall))) {
+        const tall = h > LIMIT && y < LIMIT / 2;
+        if (y > 0 && (force || (y + h > LIMIT && !tall))) {
           breaks.push([offset, Math.max(0, PAGE.contentH - y), page++]);
           y = 0;
         }

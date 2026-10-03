@@ -508,113 +508,41 @@ function autosize(ta) {
   ta.style.height = ta.scrollHeight + 2 + "px";
 }
 
-/* ---------------- 인쇄: 마크다운을 쪽으로 그려서(화면 해석기) 인쇄한다 ---------------- */
+/* ---------------- 인쇄·미리보기: 편집기 화면 그대로 ---------------- */
 
-/* 쪽: A4(210×297mm), 여백 좌우 20mm·위아래 30mm. 블록을 차례로 쪽에 담다가 넘치면 다음 쪽으로 넘긴다.
-   <!-- pagebreak --> 뒤는 무조건 새 쪽. 표·목록이 쪽을 넘치면 줄(tr)·항목(li) 단위로 잘라 다음 쪽에 잇는다(표는 머리 줄 반복). */
-function newSheet(doc) {
-  const sheet = el("section", "sheet");
-  const body = el("div", "sheet-body");
-  const no = el("div", "sheet-no");
-  sheet.append(body, no);
-  doc.append(sheet);
-  return body;
+/* 인쇄와 두 쪽 미리보기는 편집기 DOM을 복제해 쓴다 - 마크다운을 따로 다시 그리면(이전 방식) 화면·한글과 모양이 어긋난다(표 너비·글꼴·간격).
+   쪽 경계는 편집기의 쪽 경계 위젯(.nm-pagegap) 위치를 그대로 따른다. */
+function cloneEditorContent(t) {
+  const pm = t.host.querySelector(".nm-pm").cloneNode(true);
+  pm.removeAttribute("contenteditable");
+  pm.querySelectorAll(".nm-handle, .nm-tablebox, [data-resize-handle], .column-resize-handle, .nm-bubble").forEach((e) => e.remove());
+  pm.querySelectorAll(".ProseMirror-selectednode, .selectedCell").forEach((e) => e.classList.remove("ProseMirror-selectednode", "selectedCell"));
+  pm.querySelectorAll(".is-empty").forEach((e) => e.classList.remove("is-empty"));
+  return pm;
 }
 
-function applyStyles(root) {
-  for (const s of root.querySelectorAll(".st")) {
-    const d = s.dataset;
-    if (d.color) s.style.color = d.color;
-    if (d.bg) s.style.backgroundColor = d.bg;
-    if (d.font) s.style.fontFamily = `"${d.font}"`;
-    if (d.size) s.style.fontSize = d.size;
+/** 쪽 경계마다 .sheet로 나눈 복제본(두 쪽 미리보기용). 쪽 나눔 끔이면 한 장. */
+function sheetsFromEditor(t, target) {
+  target.textContent = "";
+  const pm = cloneEditorContent(t);
+  let body = null, n = 0;
+  const open = () => { const sheet = el("section", "sheet"); body = el("div", "sheet-body nm-pm"); sheet.append(body, el("div", "sheet-no", `- ${++n} -`)); target.append(sheet); };
+  open();
+  for (const node of [...pm.childNodes]) {
+    if (node.classList?.contains("nm-pagegap")) { open(); continue; }
+    body.append(node);
   }
-}
-
-function printBlock(md, i) {
-  const wrap = el("div", "block");
-  wrap.dataset.i = i;
-  const body = el("div", "block-body");
-  body.innerHTML = MD.renderBlock(md); // MD.renderBlock은 원문을 전부 이스케이프한다(markdown.js 머리말)
-  applyStyles(body);
-  wrap.append(body);
-  return wrap;
-}
-
-function topIn(e, ancestor) {
-  let top = 0;
-  for (; e && e !== ancestor; e = e.offsetParent) top += e.offsetTop;
-  return top;
-}
-
-/** 넘친 블록을 자른다: 들어가는 줄까지만 남기고 나머지(와 그 뒤 내용)를 이어 붙일 조각으로 돌려준다. 못 자르면 null. */
-function splitBlock(wrap, sheetBody, limit) {
-  const target = wrap.querySelector(":scope > .block-body > table, :scope > .block-body > ul, :scope > .block-body > ol");
-  if (!target) return null;
-  const isTable = target.tagName === "TABLE";
-  const rows = isTable ? [...target.querySelectorAll(":scope > tbody > tr")] : [...target.children];
-  const over = rows.findIndex((r) => topIn(r, sheetBody) + r.offsetHeight > limit);
-  if (over < 1) return null; // 첫 줄부터 안 들어가면 통째로 다음 쪽으로
-  const cont = el("div", "block cont");
-  const body = el("div", "block-body");
-  const shell = target.cloneNode(false);
-  if (isTable) {
-    const thead = target.querySelector(":scope > thead");
-    if (thead) shell.append(thead.cloneNode(true));
-    const tbody = el("tbody");
-    tbody.append(...rows.slice(over));
-    shell.append(tbody);
-  } else {
-    shell.append(...rows.slice(over));
-    if (shell.tagName === "OL") shell.start = Number(target.getAttribute("start") || 1) + over;
-  }
-  body.append(shell);
-  while (target.nextSibling) body.append(target.nextSibling);
-  applyStyles(body);
-  cont.append(body);
-  return cont;
-}
-
-async function buildPrintDoc(md, t, doc = $("#print-doc")) {
-  doc.textContent = "";
-  const blocks = MD.splitBlocks(md).map((b, i) => printBlock(b, i));
-  // 그림을 먼저 넣는다(높이를 재야 하니까)
-  for (const b of blocks) {
-    for (const img of b.querySelectorAll("img[data-src]")) {
-      const rel = resolvePath(img.dataset.src, t);
-      try { img.src = rel ? await t.store.imageUrl(rel) : ""; } catch { img.replaceWith(el("span", "blocked", `[그림 없음: ${img.dataset.src}]`)); }
-    }
-  }
-  doc.hidden = false;
-  let body = newSheet(doc);
-  const limit = () => body.clientHeight;
-  const overflow = (b) => b.offsetTop + b.offsetHeight > limit();
-  const queue = blocks;
-  for (let k = 0; k < queue.length; k++) {
-    const b = queue[k];
-    body.append(b);
-    if (overflow(b)) {
-      let cont = splitBlock(b, body, limit());
-      if (!cont && body.childElementCount > 1) {
-        b.remove();
-        body = newSheet(doc);
-        body.append(b);
-        if (overflow(b)) cont = splitBlock(b, body, limit());
-      }
-      if (cont) queue.splice(k + 1, 0, cont);
-    }
-    if (b.querySelector("[data-pagebreak]")) body = newSheet(doc);
-  }
-  doc.querySelectorAll(".sheet").forEach((sh, n) => (sh.querySelector(".sheet-no").textContent = `- ${n + 1} -`));
 }
 
 async function printDoc(pdfHint) {
   const t = cur();
   if (!t) return;
-  await buildPrintDoc(docText(), t);
-  document.body.classList.add("printing");
+  const doc = $("#print-doc");
+  doc.textContent = "";
+  doc.append(cloneEditorContent(t)); // 한 흐름으로 두고 쪽 경계에서만 쪽을 넘긴다(긴 표는 브라우저가 줄 단위로 자르고 머리 줄을 반복)
+  doc.hidden = false;
   if (pdfHint) status("인쇄 창의 '프린터'에서 'PDF로 저장'(또는 Microsoft Print to PDF)을 고르세요.");
-  const done = () => { document.body.classList.remove("printing"); $("#print-doc").hidden = true; $("#print-doc").textContent = ""; window.removeEventListener("afterprint", done); };
+  const done = () => { doc.hidden = true; doc.textContent = ""; window.removeEventListener("afterprint", done); };
   window.addEventListener("afterprint", done);
   setTimeout(() => window.print(), 50);
 }
@@ -796,7 +724,7 @@ async function setZoom(z) {
     if (state.previewFor !== t || state.previewText !== docText()) {
       state.previewFor = t;
       state.previewText = docText();
-      await buildPrintDoc(state.previewText, t, $("#preview"));
+      sheetsFromEditor(t, $("#preview"));
     }
     status("쪽 미리보기(읽기 전용) · 쪽을 누르거나 Ctrl+0을 누르면 편집으로 돌아갑니다");
   } else state.previewFor = null;

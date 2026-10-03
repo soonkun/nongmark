@@ -141,6 +141,16 @@ with sync_playwright() as p:
     assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() == 0 and page.inner_text("#pages") == "" and page.evaluate("localStorage.getItem('nongmak.pages')") == "0"
     page.click("#btn-pages"); time.sleep(0.5)
     assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() >= 2
+    # 인쇄: 편집기 DOM 복제본 한 흐름, 쪽 경계 수가 같고 PDF 쪽 수 = 경계 + 1 (Chromium 인쇄 엔진)
+    page.evaluate("() => { const t = cur(); const d = document.querySelector('#print-doc'); d.textContent = ''; d.append(cloneEditorContent(t)); d.hidden = false; }")
+    gaps_e = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(); gaps_p = page.locator("#print-doc .nm-pagegap").count()
+    print("경계 편집기/인쇄:", gaps_e, gaps_p, "| 편집 속성:", page.evaluate("[...document.querySelectorAll('#print-doc [contenteditable]')].map(e => e.tagName + '.' + e.className + '=' + e.getAttribute('contenteditable')).slice(0,5)"))
+    assert gaps_e == gaps_p and page.locator("#print-doc .nm-handle").count() == 0
+    page.pdf(path=str(ROOT / "build" / "print.pdf"), prefer_css_page_size=True)
+    import re as _re
+    npages = len(_re.findall(rb"/Type\s*/Page[^s]", (ROOT / "build" / "print.pdf").read_bytes()))
+    print("인쇄: 쪽 경계", gaps_e, "| PDF 쪽 수", npages); assert npages == gaps_e + 1
+    page.evaluate("() => { const d = document.querySelector('#print-doc'); d.hidden = true; d.textContent = ''; }")
     # 한글로 내보내기
     page.click("#btn-file"); page.click("#m-hwpx"); time.sleep(1.5)
     exp = page.evaluate("window.__export")
