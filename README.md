@@ -29,11 +29,18 @@
 - **농막**은 농사일 하다 잠깐 들어가 쉬고 연장을 손보는 작은 집입니다. 농촌진흥청이 만든 **마크다운 편집기(농+마크)** 이자, **새싹이가 작업하는 농막**이라는 두 뜻을 담았습니다.
 - 영어 이름은 **nongmark** — 농(nong) + mark(down). 실행 파일과 설치 프로그램 이름입니다.
 
-아이콘도 둘입니다. 왼쪽이 **프로그램**(초록 네모), 오른쪽이 **문서** — 설치하면 탐색기의 `.md` 파일 아이콘이 이 접힌 종이 꼴로 바뀌어, 실행 파일인지 문서인지 한눈에 구분됩니다.
+아이콘도 둘입니다. **프로그램**은 초록 네모, **문서**는 접힌 종이 꼴 — 실행 파일인지 문서인지 한눈에 구분됩니다.
 
 <p align="center">
   <img src="docs/icon-app.png" alt="프로그램 아이콘" width="96">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="docs/icon-doc.png" alt="문서(.md) 아이콘" width="96">
+</p>
+
+설치하면 탐색기의 `.md` 파일 아이콘이 Windows 기본 모양에서 새싹이 문서 아이콘으로 바뀝니다.
+
+<p align="center">
+  <img src="docs/icon-md-before.png" alt="설치 전 .md 아이콘" width="96">&nbsp;&nbsp;&nbsp;<b>→</b>&nbsp;&nbsp;&nbsp;
+  <img src="docs/icon-doc.png" alt="설치 후 .md 아이콘" width="96">
 </p>
 
 <p align="center"><img src="docs/home.png" alt="대문" width="820"></p>
