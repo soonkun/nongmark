@@ -1,4 +1,5 @@
 <p align="center">
+  <img src="docs/rda.png" alt="농촌진흥청" height="128">&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="docs/icon-app.png" alt="농막 아이콘" width="128">
 </p>
 <p align="center">
