@@ -200,6 +200,8 @@ with sync_playwright() as p:
       return [a, tree["회의"]["1차.md"], rel, Object.keys(tree.assets), url.slice(0, 22), miss, st.dir]; }""")
     print("폴더 저장소:", fs); assert fs == ["# a", "# 1차", "assets/q.png", ["q.png"], "data:image/png;base64,", "err", "시험폴더"]
     assert page.evaluate("document.querySelector('#m-folder').hidden") is True  # 창 모드(NATIVE)에서는 숨김
+    sc = page.evaluate("shortcutText('file:///C:/Users/a%20b/%EB%86%8D%EB%A7%89/nongmark.html')")
+    print("바로 가기:", repr(sc)); assert sc == "[InternetShortcut]\r\nURL=file:///C:/Users/a%20b/%EB%86%8D%EB%A7%89/nongmark.html\r\nIconFile=C:\\Users\\a b\\농막\\nongmark.ico\r\nIconIndex=0\r\n"
     # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
     page.click("#btn-pages"); time.sleep(0.5)
     print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmark.pages')"))

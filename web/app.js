@@ -760,6 +760,28 @@ async function linkFolder() {
   }
 }
 
+/** Windows 바로 가기(.url) 글. 이 html의 주소와, 같은 폴더의 nongmark.ico를 아이콘으로. */
+function shortcutText(href = document.URL) {
+  const win = decodeURIComponent(href.replace(/^file:\/\/\//, "")).replace(/\//g, "\\"); // file:///C:/a/b.html → C:\a\b.html
+  const dir = win.slice(0, win.lastIndexOf("\\"));
+  return `[InternetShortcut]\r\nURL=${href}\r\nIconFile=${dir}\\nongmark.ico\r\nIconIndex=0\r\n`;
+}
+async function makeShortcut() {
+  if (!document.URL.startsWith("file:")) return status("파일로 연 nongmark.html에서만 만들 수 있습니다.", "error");
+  const text = shortcutText();
+  if (FS_SAVE) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: "새싹이의 농막.url", types: [{ description: "바로 가기", accept: { "text/plain": [".url"] } }] });
+      await writeHandle(h, text);
+      status("바로 가기를 만들었습니다 - nongmark.ico를 nongmark.html 옆에 두면 농막 아이콘으로 보입니다.", "ok");
+    } catch (e) {
+      if (!isAbort(e)) status("만들지 못했습니다: " + (e.message || e), "error");
+    }
+    return;
+  }
+  download("새싹이의 농막.url", text, "text/plain");
+}
+
 function toggleMenu(force) {
   const menu = $("#filemenu");
   const open = force ?? menu.hidden;
@@ -869,10 +891,11 @@ async function start() {
     "m-new": newDocument, "m-open": openDialog, "m-folder": linkFolder,
     "m-save": () => { const t = cur(); if (t) { t.dirty = true; save(t); } }, "m-saveas": saveAs,
     "m-hwpx": exportHwpx, "m-pdf": () => printDoc(true), "m-print": () => printDoc(false),
-    "m-close": () => closeTab(state.tab),
+    "m-close": () => closeTab(state.tab), "m-shortcut": makeShortcut,
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
   $("#m-folder").hidden = NATIVE || !FS_DIR; // 프로그램 창은 폴더를 스스로 안다
+  $("#m-shortcut").hidden = NATIVE || !document.URL.startsWith("file:"); // 브라우저로 연 html에서만
   // 이 창은 어디로도 이동하지 않는다(프로그램 쪽에서도 막지만 화면에서도): 미리보기·인쇄 쪽의 링크는 followLink로, 끌어다 놓은 파일은 무시
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("a[href]");
