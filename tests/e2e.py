@@ -173,6 +173,20 @@ with sync_playwright() as p:
     print("격자 폭/책상 폭:", round(w2), desk); assert desk - 60 <= w2 <= desk, "폭에 딱 맞게"
     page.click("#zoom-val"); page.click("#pop-zoom button:has-text('100%')"); time.sleep(0.4)
     assert page.inner_text("#zoom-val") == "100%" and page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0
+    # 쪽 배열 선택: "한 쪽씩"을 고르면 두 쪽이 들어가는 배율에서도 격자를 안 만들고, 다시 "두 쪽 나란히"면 돌아온다(설정은 localStorage)
+    page.click("#zoom-val"); page.click("#pop-zoom button:has-text('두 쪽 폭 맞춤')"); time.sleep(0.5)
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4
+    page.click("#zoom-val"); page.click("#pop-zoom button:has-text('한 쪽씩')"); time.sleep(0.5)
+    print("한 쪽씩:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmak.cols')"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0 and page.evaluate("localStorage.getItem('nongmak.cols')") == "1"
+    page.click("#zoom-val"); page.click("#pop-zoom button:has-text('두 쪽 나란히')"); time.sleep(0.5)
+    print("두 쪽 나란히:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmak.cols')"), page.evaluate("[state.cols, state.zoom, state.two, fitsTwo()]"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4 and page.evaluate("localStorage.getItem('nongmak.cols')") == "auto"
+    page.click("#zoom-val"); page.click("#pop-zoom button:has-text('100%')"); time.sleep(0.4)
+    # 브라우저 저장소(single): 파일 손잡이가 있으면 내려받기 대신 그 손잡이에 쓴다
+    written = page.evaluate("""async () => { const log = []; const h = { name: "손잡이.md", createWritable: async () => ({ write: async (d) => log.push(d), close: async () => log.push("close") }) };
+      const st = singleStore("손잡이.md", "# 처음", h); await st.write("손잡이.md", "# 고침"); return log; }""")
+    print("손잡이 저장:", written); assert written == ["# 고침", "close"]
     # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
     page.click("#btn-pages"); time.sleep(0.5)
     print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmak.pages')"))

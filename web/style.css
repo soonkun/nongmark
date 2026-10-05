@@ -110,6 +110,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .pop .pi { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 12px; border: 0; background: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13.5px; text-align: left; white-space: nowrap; }
 .pop .pi:hover, .pop .pi.on { background: var(--green-soft); }
 .pop .pi small { color: var(--muted); font-size: 11px; }
+.pop .sep { border-top: 1px solid var(--line); margin: 4px 2px; }
 .pal { display: grid; grid-template-columns: repeat(6, 22px); gap: 4px; padding: 8px; min-width: 0; }
 .pal button { width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0,0,0,.15); border-radius: 5px; cursor: pointer; }
 .pal button.none { grid-column: 1 / -1; width: auto; height: auto; padding: 3px 6px; font-size: 12px; color: var(--muted); border-color: var(--line); background: none; }

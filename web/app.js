@@ -2,7 +2,8 @@
 // 파일은 언제나 마크다운(.md). 편집기 ⇄ 마크다운 변환은 편집기 묶음(web/editor-app)이 한다.
 // 저장소는 둘 중 하나 - 같은 함수 모양(read/write/saveAsset/imageUrl)을 갖는다:
 //   native : nongmark.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음). 문서가 든 폴더(dir)가 열쇠.
-//   single : 브라우저에서 nongmark.html을 연 경우 - 파일 하나를 열고 내려받기로 저장.
+//   single : 브라우저에서 nongmark.html을 연 경우 - 파일 하나를 연다. Edge·Chrome이면 파일 손잡이(File System Access API)로 그 파일에 바로
+//            덮어쓰고, 손잡이를 못 얻는 브라우저(정책으로 막힘·Firefox)에서는 내려받기로 저장.
 // 네트워크: 이 코드는 어디에도 연결하지 않는다. 페이지의 CSP가 connect-src 'none'으로 막는다.
 
 "use strict";
@@ -44,20 +45,35 @@ function nativeStore(info) {
   };
 }
 
-function singleStore(name, text) {
+const MD_TYPES = [{ description: "마크다운 문서", accept: { "text/markdown": [".md", ".markdown"] } }];
+const FS_OPEN = typeof window.showOpenFilePicker === "function", FS_SAVE = typeof window.showSaveFilePicker === "function";
+const isAbort = (e) => e && e.name === "AbortError"; // 사용자가 대화상자를 취소함
+
+function download(name, data, type) {
+  const a = el("a");
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = name.split("/").pop();
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function writeHandle(handle, data) {
+  const w = await handle.createWritable(); // 첫 저장 때 브라우저가 "이 파일을 고쳐도 되는지" 한 번 묻는다
+  await w.write(data);
+  await w.close();
+}
+
+function singleStore(name, text, handle = null) {
   const files = { [name]: text };
   return {
     kind: "single",
     rootName: "",
     dir: "",
+    handle, // 열 때 받은 파일 손잡이(없으면 내려받기)
     async read(p) { return files[p]; },
     async write(p, t) {
       files[p] = t;
-      const a = el("a");
-      a.href = URL.createObjectURL(new Blob([t], { type: "text/markdown;charset=utf-8" }));
-      a.download = p.split("/").pop();
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      if (handle) return writeHandle(handle, t);
+      download(p, t, "text/markdown;charset=utf-8");
     },
     async saveAsset() { throw new Error("그림 넣기는 프로그램 창(nongmark.exe)에서 쓸 수 있습니다."); },
     async imageUrl() { throw new Error("no folder"); },
@@ -73,6 +89,7 @@ const state = {
   zoom: 1,
   raw: false,
   pages: true, // 쪽 나눔 보기(끄면 내용 길이대로 이어지는 한 장)
+  cols: "auto", // 쪽 배열: "auto" = 폭에 두 장이 들어가면 나란히, "1" = 배율과 상관없이 늘 한 쪽씩 세로로
 };
 const cur = () => state.tabs[state.tab];
 
@@ -573,11 +590,17 @@ async function saveBytes(bytes, name, ext) {
     if (where) status(`${ext.toUpperCase()}로 저장했습니다: ${where}`, "ok");
     return;
   }
-  const a = el("a");
-  a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
-  a.download = name + "." + ext;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  if (FS_SAVE) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: name + "." + ext, types: [{ description: ext.toUpperCase() + " 파일", accept: { "application/octet-stream": ["." + ext] } }] });
+      await writeHandle(h, bytes);
+      status(`${ext.toUpperCase()}로 저장했습니다: ${h.name}`, "ok");
+    } catch (e) {
+      if (!isAbort(e)) status("저장하지 못했습니다: " + (e.message || e), "error");
+    }
+    return;
+  }
+  download(name + "." + ext, bytes, "application/octet-stream");
 }
 
 async function exportHwpx() {
@@ -620,11 +643,25 @@ async function saveAs() {
       return false;
     }
   }
-  const a = el("a"); // 브라우저: 내려받기
-  a.href = URL.createObjectURL(new Blob([docText(t)], { type: "text/markdown;charset=utf-8" }));
-  a.download = name + ".md";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  if (FS_SAVE) { // 브라우저: 저장 위치를 고르고 그 파일에 쓴다 - 이후 Ctrl+S는 그 파일에 바로 덮어쓴다
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: name + ".md", types: MD_TYPES });
+      const text = docText(t);
+      await writeHandle(h, text);
+      t.store = singleStore(h.name, text, h);
+      t.path = h.name;
+      t.untitled = false;
+      t.dirty = false;
+      renderTabs();
+      setDocTitle();
+      status("저장됨", "ok");
+      return true;
+    } catch (e) {
+      if (!isAbort(e)) status("저장하지 못했습니다: " + (e.message || e), "error");
+      return false;
+    }
+  }
+  download(name + ".md", docText(t), "text/markdown;charset=utf-8"); // 손잡이를 못 쓰는 브라우저: 내려받기
   t.dirty = false;
   renderTabs();
   return true;
@@ -640,7 +677,17 @@ async function openDialog() {
   }
 }
 
-function openSingle() {
+async function openSingle() {
+  if (FS_OPEN) {
+    try {
+      const [h] = await window.showOpenFilePicker({ types: MD_TYPES, multiple: false });
+      const f = await h.getFile();
+      await openPath(singleStore(f.name, await f.text(), h), f.name);
+    } catch (e) {
+      if (!isAbort(e)) status("열지 못했습니다: " + (e.message || e), "error");
+    }
+    return;
+  }
   const input = el("input");
   input.type = "file";
   input.accept = ".md,.markdown,text/markdown,text/plain";
@@ -709,9 +756,15 @@ function setZoom(z) {
   $("#editors").style.zoom = state.zoom;
   $("#raw-wrap").style.zoom = state.zoom;
   $("#zoom-val").textContent = Math.round(state.zoom * 100) + "%";
-  const two = fitsTwo() && state.pages; // 배율과 무관하게 폭에 두 장이 들어가면 격자(넓은 화면은 100%에서도)
+  const two = state.cols !== "1" && fitsTwo() && state.pages; // 배율과 무관하게 폭에 두 장이 들어가면 격자(넓은 화면은 100%에서도) - "한 쪽씩"을 고르면 안 함
   for (const t of state.tabs) t.ed.setGrid(two, 2);
   state.two = two;
+}
+
+function setCols(v) {
+  state.cols = v;
+  try { localStorage.setItem("nongmak.cols", v); } catch { /* 무시 */ }
+  setZoom(state.zoom);
 }
 
 function setPages(on) {
@@ -778,6 +831,7 @@ async function start() {
   setupRail();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   $("#btn-pages").onclick = () => setPages(!state.pages);
+  try { if (localStorage.getItem("nongmak.cols") === "1") state.cols = "1"; } catch { /* 무시 */ }
   try { if (localStorage.getItem("nongmak.pages") === "0") { state.pages = false; $("#btn-pages").classList.remove("on"); $("#btn-pages").title = "쪽 나눔 보기 켜기(A4 쪽으로)"; } } catch { /* 무시 */ }
   $("#raw").oninput = () => {
     autosize($("#raw"));
@@ -806,6 +860,13 @@ async function start() {
       const b = el("button", "pi" + (Math.abs(z - state.zoom) < 0.005 ? " on" : ""), label);
       b.type = "button";
       b.onclick = () => { pop.hidden = true; setZoom(z); };
+      pop.append(b);
+    }
+    pop.append(el("div", "sep"));
+    for (const [v, label] of [["auto", "두 쪽 나란히 (폭이 되면)"], ["1", "한 쪽씩 (늘 세로로)"]]) {
+      const b = el("button", "pi" + (state.cols === v ? " on" : ""), label);
+      b.type = "button";
+      b.onclick = () => { pop.hidden = true; setCols(v); };
       pop.append(b);
     }
     pop.hidden = false;

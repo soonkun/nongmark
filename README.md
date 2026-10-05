@@ -100,7 +100,7 @@
 | 파일 | 쓰임 |
 |---|---|
 | `nongmark-setup.exe` | **설치 프로그램**(약 2MB). 안에 프로그램과 마이크로소프트가 서명한 WebView2Loader.dll(NuGet `Microsoft.Web.WebView2` 1.0.4258.31)이 들어 있다 |
-| `nongmark.html` | 프로그램 없이 Edge·Chrome으로 여는 판(파일 하나 열기·내려받기 저장) |
+| `nongmark.html` | 프로그램 없이 Edge·Chrome으로 여는 판. 열기·저장은 브라우저의 파일 대화상자로 하고 그 파일에 바로 덮어쓴다(그림 넣기·폴더 안 그림·.md 더블클릭은 안 됨) |
 | `SHA256SUMS.txt` | 위 파일들의 SHA-256 — `certutil -hashfile nongmark-setup.exe SHA256`으로 대조 |
 
 (`nongmark.exe`·`WebView2Loader.dll`도 dist/에 남아 있다 - 설치 없이 폴더째 두고 쓰는 휴대용. 두 파일이 같은 폴더에 있어야 한다.)
