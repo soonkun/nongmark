@@ -15,7 +15,7 @@ import (
 
 var (
 	dll      *syscall.LazyDLL
-	errNoDLL = errors.New("WebView2Loader.dll을 찾지 못했습니다 - nongmak.exe와 같은 폴더에 있어야 합니다")
+	errNoDLL = errors.New("WebView2Loader.dll을 찾지 못했습니다 - nongmark.exe와 같은 폴더에 있어야 합니다")
 )
 
 func load() (*syscall.LazyDLL, error) {

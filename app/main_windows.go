@@ -223,7 +223,7 @@ func main() {
 		}
 		return p, os.WriteFile(p, data, 0o644)
 	})
-	w.Init("window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;")
+	w.Init("window.NONGMARK_NATIVE = true; window.NONGMARK_FRAMELESS = true;")
 	w.SetFrameless(true)
 	// 창을 닫으려 하면(단추·Alt+F4·작업 표시줄) 화면에 먼저 묻는다 - 저장 안 된 문서가 있으면 저장할지 묻고 "close-now"로 답한다
 	// 화면이 10초 안에 답하지 않으면(멈춤 등) 그냥 닫는다

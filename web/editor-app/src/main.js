@@ -399,6 +399,12 @@ function create(container, opts = {}) {
     editor,
     getMarkdown: () => mdFromDoc(editor.getJSON()),
     async setMarkdown(md) { await preload(md); editor.commands.setContent(docFromMd(md), { emitUpdate: false }); },
+    /** 그림을 다시 불러온다(저장소가 바뀌어 전에 못 읽던 그림이 읽힐 때) - 문서는 그대로, 화면의 src만 갈아 끼운다. */
+    async reloadImages() {
+      imageCache.clear();
+      await preload(handle.getMarkdown());
+      for (const img of sheet.querySelectorAll("img[data-src]")) img.src = imageCache.get(img.getAttribute("data-src")) || "";
+    },
     focus: () => editor.commands.focus(),
     destroy: () => { bb.destroy(); editor.destroy(); sheet.remove(); },
     on: (name, fn) => listeners[name].push(fn),

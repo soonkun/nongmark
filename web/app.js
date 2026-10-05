@@ -4,6 +4,7 @@
 //   native : nongmark.exe 창(WebView2) 안. 프로그램이 넣어 준 nm_* 함수를 부른다(같은 프로세스, 네트워크 없음). 문서가 든 폴더(dir)가 열쇠.
 //   single : 브라우저에서 nongmark.html을 연 경우 - 파일 하나를 연다. Edge·Chrome이면 파일 손잡이(File System Access API)로 그 파일에 바로
 //            덮어쓰고, 손잡이를 못 얻는 브라우저(정책으로 막힘·Firefox)에서는 내려받기로 저장.
+//   folder : 브라우저에서 "폴더 연결…"로 받은 폴더 손잡이. native와 같은 일(폴더 안 그림·링크·그림 넣기)을 폴더 손잡이로 한다.
 // 네트워크: 이 코드는 어디에도 연결하지 않는다. 페이지의 CSP가 connect-src 'none'으로 막는다.
 
 "use strict";
@@ -19,7 +20,7 @@ const MD_EXT = /\.(md|markdown)$/i;
 
 /* ---------------- 저장소 ---------------- */
 
-const NATIVE = !!window.NONGMAK_NATIVE;
+const NATIVE = !!window.NONGMARK_NATIVE;
 // 겹겹이 막기: 편집기 라이브러리 어딘가에서 창을 열거나 주소를 옮기려 해도 못 하게 한다(링크는 Ctrl+클릭 → followLink가 .md만 연다)
 try { window.open = () => null; } catch { /* 무시 */ }
 
@@ -46,7 +47,7 @@ function nativeStore(info) {
 }
 
 const MD_TYPES = [{ description: "마크다운 문서", accept: { "text/markdown": [".md", ".markdown"] } }];
-const FS_OPEN = typeof window.showOpenFilePicker === "function", FS_SAVE = typeof window.showSaveFilePicker === "function";
+const FS_OPEN = typeof window.showOpenFilePicker === "function", FS_SAVE = typeof window.showSaveFilePicker === "function", FS_DIR = typeof window.showDirectoryPicker === "function";
 const isAbort = (e) => e && e.name === "AbortError"; // 사용자가 대화상자를 취소함
 
 function download(name, data, type) {
@@ -60,6 +61,35 @@ async function writeHandle(handle, data) {
   const w = await handle.createWritable(); // 첫 저장 때 브라우저가 "이 파일을 고쳐도 되는지" 한 번 묻는다
   await w.write(data);
   await w.close();
+}
+
+/** 브라우저 폴더 저장소. 경로는 폴더 기준("회의/1차.md") - 손잡이는 그 폴더 밖으로 못 나가므로 os.Root와 같은 울타리가 된다. */
+function folderStore(dirHandle, dirName = dirHandle.name) {
+  const at = async (p, create = false) => { // "a/b/c.md" → {d: b 폴더 손잡이, name: "c.md"}
+    const segs = p.split("/").filter(Boolean);
+    const name = segs.pop();
+    let d = dirHandle;
+    for (const s of segs) d = await d.getDirectoryHandle(s, { create });
+    return { d, name };
+  };
+  return {
+    kind: "folder",
+    rootName: dirName,
+    dir: dirName, // 탭 제목·같은 문서 판별에 쓴다
+    handle: dirHandle,
+    async read(p) { const { d, name } = await at(p); return (await (await d.getFileHandle(name)).getFile()).text(); },
+    async write(p, t) { const { d, name } = await at(p, true); await writeHandle(await d.getFileHandle(name, { create: true }), t); },
+    async saveAsset(name, blob) {
+      const a = await dirHandle.getDirectoryHandle("assets", { create: true });
+      await writeHandle(await a.getFileHandle(name, { create: true }), blob);
+      return "assets/" + name;
+    },
+    async imageUrl(p) {
+      const { d, name } = await at(p);
+      const f = await (await d.getFileHandle(name)).getFile();
+      return `data:${f.type || "image/png"};base64,` + await blobToBase64(f);
+    },
+  };
 }
 
 function singleStore(name, text, handle = null) {
@@ -141,7 +171,10 @@ async function addTab(doc, markdown) {
       if (img.kind === "data") return img.src;
       const rel = resolvePath(img.src, t);
       if (!rel) return "";
-      try { return await t.store.imageUrl(rel); } catch { return ""; }
+      try { return await t.store.imageUrl(rel); } catch {
+        if (t.store?.kind === "single" && !t.hinted) { t.hinted = true; status("폴더 안 그림을 보려면 파일 ▸ 그림이 든 폴더 연결…", "error"); }
+        return "";
+      }
     },
     saveImage: (file) => storeImage(file, t),
   });
@@ -287,7 +320,7 @@ function changed() {
   if (!t) return;
   if (!t.dirty) { t.dirty = true; renderTabs(); }
   countChars();
-  status(t.store.kind === "single" ? "저장 안 됨 · Ctrl+S로 내려받기" : "저장 안 됨 · Ctrl+S");
+  status(t.store.kind === "single" && !t.store.handle ? "저장 안 됨 · Ctrl+S로 내려받기" : "저장 안 됨 · Ctrl+S");
 }
 
 async function save(t = cur()) {
@@ -368,7 +401,7 @@ function followLink(href) {
 /** 그림 파일을 문서 폴더의 assets/에 저장하고 문서 기준 상대 경로를 돌려준다. */
 async function storeImage(file, t = cur()) {
   if (file.size > 20 * 1024 * 1024) return status("그림이 20MB를 넘습니다.", "error"), null;
-  if (t.untitled || !t.store || t.store.kind !== "native") return status("그림을 넣으려면 먼저 문서를 저장하세요(Ctrl+S) - 그림은 문서 옆 assets 폴더에 저장됩니다.", "error"), null;
+  if (t.untitled || !t.store || !["native", "folder"].includes(t.store.kind)) return status("그림을 넣으려면 먼저 문서를 저장하세요(Ctrl+S) - 그림은 문서 옆 assets 폴더에 저장됩니다.", "error"), null;
   try {
     const ext = file.type.split("/")[1].replace("jpeg", "jpg");
     const name = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14) + "-" + Math.random().toString(36).slice(2, 6) + "." + ext;
@@ -699,6 +732,34 @@ async function openSingle() {
   input.click();
 }
 
+/** 브라우저: 연 문서가 든 폴더를 연결한다 - 그때부터 폴더 안 그림이 보이고, 그림 넣기·문서 링크 열기·저장이 그 폴더 손잡이로 된다. */
+async function linkFolder() {
+  const t = cur();
+  if (!t) return status("먼저 문서를 여세요.", "error");
+  if (t.untitled) return status("새 문서는 먼저 저장하세요(Ctrl+S).", "error");
+  try {
+    const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+    let path = t.path;
+    if (t.store.handle && t.store.kind === "single") {
+      const rel = await dir.resolve(t.store.handle); // 연 파일이 그 폴더 안에 있어야 상대 경로(그림·링크)가 맞는다
+      if (!rel) return status(`"${nameOf(t)}.md"가 "${dir.name}" 폴더 안에 없습니다. 문서가 든 폴더를 고르세요.`, "error");
+      path = rel.join("/");
+    } else {
+      try { await dir.getFileHandle(path); } catch { return status(`"${path}"가 "${dir.name}" 폴더 안에 없습니다. 문서가 든 폴더를 고르세요.`, "error"); }
+    }
+    const store = folderStore(dir);
+    for (const x of state.tabs) if (x.store?.kind === "single" && x !== t) { try { const r = x.store.handle && await dir.resolve(x.store.handle); if (r) { x.store = store; x.path = r.join("/"); } } catch { /* 무시 */ } }
+    t.store = store;
+    t.path = path;
+    renderTabs();
+    setDocTitle();
+    await t.ed.reloadImages();
+    status(`폴더 연결됨: ${dir.name}`, "ok");
+  } catch (e) {
+    if (!isAbort(e)) status("폴더를 연결하지 못했습니다: " + (e.message || e), "error");
+  }
+}
+
 function toggleMenu(force) {
   const menu = $("#filemenu");
   const open = force ?? menu.hidden;
@@ -709,7 +770,7 @@ function toggleMenu(force) {
 /* ---------------- 창 제목 줄(탭 줄) - 프로그램 창에는 시스템 제목 줄이 없다 ---------------- */
 
 function setupTitlebar() {
-  if (!window.NONGMAK_FRAMELESS || !window.nm_win) return;
+  if (!window.NONGMARK_FRAMELESS || !window.nm_win) return;
   $("#wincmd").hidden = false;
   const win = (cmd) => window.nm_win(cmd).then(syncMax).catch(() => {});
   const syncMax = (zoomed) => {
@@ -763,7 +824,7 @@ function setZoom(z) {
 
 function setCols(v) {
   state.cols = v;
-  try { localStorage.setItem("nongmak.cols", v); } catch { /* 무시 */ }
+  try { localStorage.setItem("nongmark.cols", v); } catch { /* 무시 */ }
   setZoom(state.zoom);
 }
 
@@ -772,7 +833,7 @@ function setPages(on) {
   $("#btn-pages").classList.toggle("on", on);
   $("#btn-pages").title = on ? "쪽 나눔 보기 끄기(이어지는 한 장으로)" : "쪽 나눔 보기 켜기(A4 쪽으로)";
   for (const t of state.tabs) t.ed.setPages(on);
-  try { localStorage.setItem("nongmak.pages", on ? "1" : "0"); } catch { /* 무시 */ }
+  try { localStorage.setItem("nongmark.pages", on ? "1" : "0"); } catch { /* 무시 */ }
   setZoom(state.zoom);
 }
 
@@ -782,21 +843,21 @@ function toggleSide(open) {
   const show = open ?? !app.classList.contains("rail-open");
   app.classList.toggle("rail-open", show);
   $("#btn-side").classList.toggle("on", show);
-  try { localStorage.setItem("nongmak.rail", show ? "1" : "0"); } catch { /* 무시 */ }
+  try { localStorage.setItem("nongmark.rail", show ? "1" : "0"); } catch { /* 무시 */ }
   setTimeout(() => setZoom(state.zoom), 220); // 도구 막대 폭이 바뀌면(펼침 .2s 뒤) 두 쪽이 들어가는지 다시 본다
 }
 
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $("#btn-theme").textContent = theme === "dark" ? "밝게" : "어둡게";
-  try { localStorage.setItem("nongmak.theme", theme); } catch { /* 무시 */ }
+  try { localStorage.setItem("nongmark.theme", theme); } catch { /* 무시 */ }
 }
 
 /* ---------------- 시작 ---------------- */
 
 async function start() {
   try {
-    const t = localStorage.getItem("nongmak.theme");
+    const t = localStorage.getItem("nongmark.theme");
     if (t) document.documentElement.dataset.theme = t;
   } catch { /* 무시 */ }
   $("#btn-file").onclick = (ev) => {
@@ -805,12 +866,13 @@ async function start() {
   };
   document.addEventListener("click", () => toggleMenu(false));
   const menu = {
-    "m-new": newDocument, "m-open": openDialog,
+    "m-new": newDocument, "m-open": openDialog, "m-folder": linkFolder,
     "m-save": () => { const t = cur(); if (t) { t.dirty = true; save(t); } }, "m-saveas": saveAs,
     "m-hwpx": exportHwpx, "m-pdf": () => printDoc(true), "m-print": () => printDoc(false),
     "m-close": () => closeTab(state.tab),
   };
   for (const [id, fn] of Object.entries(menu)) $("#" + id).onclick = () => { toggleMenu(false); fn(); };
+  $("#m-folder").hidden = NATIVE || !FS_DIR; // 프로그램 창은 폴더를 스스로 안다
   // 이 창은 어디로도 이동하지 않는다(프로그램 쪽에서도 막지만 화면에서도): 미리보기·인쇄 쪽의 링크는 followLink로, 끌어다 놓은 파일은 무시
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("a[href]");
@@ -831,8 +893,8 @@ async function start() {
   setupRail();
   $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   $("#btn-pages").onclick = () => setPages(!state.pages);
-  try { if (localStorage.getItem("nongmak.cols") === "1") state.cols = "1"; } catch { /* 무시 */ }
-  try { if (localStorage.getItem("nongmak.pages") === "0") { state.pages = false; $("#btn-pages").classList.remove("on"); $("#btn-pages").title = "쪽 나눔 보기 켜기(A4 쪽으로)"; } } catch { /* 무시 */ }
+  try { if (localStorage.getItem("nongmark.cols") === "1") state.cols = "1"; } catch { /* 무시 */ }
+  try { if (localStorage.getItem("nongmark.pages") === "0") { state.pages = false; $("#btn-pages").classList.remove("on"); $("#btn-pages").title = "쪽 나눔 보기 켜기(A4 쪽으로)"; } } catch { /* 무시 */ }
   $("#raw").oninput = () => {
     autosize($("#raw"));
     changed();
@@ -876,7 +938,7 @@ async function start() {
   };
   document.addEventListener("click", () => { $("#pop-zoom").hidden = true; });
   $("#btn-side").onclick = () => toggleSide();
-  try { if (localStorage.getItem("nongmak.rail") === "1") toggleSide(true); } catch { /* 무시 */ }
+  try { if (localStorage.getItem("nongmark.rail") === "1") toggleSide(true); } catch { /* 무시 */ }
   document.addEventListener("keydown", (ev) => {
     if (!(ev.ctrlKey || ev.metaKey)) return;
     const k = ev.key.toLowerCase();

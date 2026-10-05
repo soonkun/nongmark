@@ -12,7 +12,7 @@ FILES = {
     "회의/1차.md": "# 1차 회의\n\n> [!NOTE]\n> 참고 상자\n\n| 항목 | 내용 |\n| --- | --- |\n| 예산 | 3억 |\n",
 }
 FAKE = """
-window.NONGMAK_NATIVE = true; window.NONGMAK_FRAMELESS = true;
+window.NONGMARK_NATIVE = true; window.NONGMARK_FRAMELESS = true;
 window.nm_win = (c) => { window.__win = (window.__win || []).concat(c); return Promise.resolve(c === "max" ? !(window.__zoomed = !window.__zoomed) === false : !!window.__zoomed); };
 const F = %s; window.__files = F; const DIR = "C:\\\\시험"; const root = {root: "시험", dir: DIR, open: "시작.md"};
 const ok = (v) => Promise.resolve(v);
@@ -177,20 +177,33 @@ with sync_playwright() as p:
     page.click("#zoom-val"); page.click("#pop-zoom button:has-text('두 쪽 폭 맞춤')"); time.sleep(0.5)
     assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4
     page.click("#zoom-val"); page.click("#pop-zoom button:has-text('한 쪽씩')"); time.sleep(0.5)
-    print("한 쪽씩:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmak.cols')"))
-    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0 and page.evaluate("localStorage.getItem('nongmak.cols')") == "1"
+    print("한 쪽씩:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmark.cols')"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() == 0 and page.evaluate("localStorage.getItem('nongmark.cols')") == "1"
     page.click("#zoom-val"); page.click("#pop-zoom button:has-text('두 쪽 나란히')"); time.sleep(0.5)
-    print("두 쪽 나란히:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmak.cols')"), page.evaluate("[state.cols, state.zoom, state.two, fitsTwo()]"))
-    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4 and page.evaluate("localStorage.getItem('nongmak.cols')") == "auto"
+    print("두 쪽 나란히:", page.locator(".nm-desk:not([hidden]) .nm-slot").count(), page.evaluate("localStorage.getItem('nongmark.cols')"), page.evaluate("[state.cols, state.zoom, state.two, fitsTwo()]"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-slot").count() >= 4 and page.evaluate("localStorage.getItem('nongmark.cols')") == "auto"
     page.click("#zoom-val"); page.click("#pop-zoom button:has-text('100%')"); time.sleep(0.4)
     # 브라우저 저장소(single): 파일 손잡이가 있으면 내려받기 대신 그 손잡이에 쓴다
     written = page.evaluate("""async () => { const log = []; const h = { name: "손잡이.md", createWritable: async () => ({ write: async (d) => log.push(d), close: async () => log.push("close") }) };
       const st = singleStore("손잡이.md", "# 처음", h); await st.write("손잡이.md", "# 고침"); return log; }""")
     print("손잡이 저장:", written); assert written == ["# 고침", "close"]
+    # 브라우저 폴더 저장소(folder): 가짜 폴더 손잡이로 읽기·하위 폴더 만들며 쓰기·assets 저장·그림 data: 주소
+    fs = page.evaluate("""async () => {
+      const mk = (tree, name) => ({ name, kind: "directory",
+        getFileHandle: async (n, o) => { if (!(n in tree)) { if (o && o.create) tree[n] = ""; else throw new Error("없음 " + n); }
+          return { getFile: async () => new File([tree[n]], n, { type: n.endsWith(".png") ? "image/png" : "text/markdown" }), createWritable: async () => ({ write: async (d) => { tree[n] = d; }, close: async () => {} }) }; },
+        getDirectoryHandle: async (n, o) => { if (!(n in tree)) { if (o && o.create) tree[n] = {}; else throw new Error("폴더 없음 " + n); } return mk(tree[n], n); } });
+      const tree = { "a.md": "# a", "img": { "p.png": new Uint8Array([137, 80, 78, 71]) } };
+      const st = folderStore(mk(tree, "시험폴더"));
+      const a = await st.read("a.md"); await st.write("회의/1차.md", "# 1차"); const rel = await st.saveAsset("q.png", new Blob([new Uint8Array([1, 2])], { type: "image/png" }));
+      const url = await st.imageUrl("img/p.png"); let miss = ""; try { await st.imageUrl("없는.png"); } catch (e) { miss = "err"; }
+      return [a, tree["회의"]["1차.md"], rel, Object.keys(tree.assets), url.slice(0, 22), miss, st.dir]; }""")
+    print("폴더 저장소:", fs); assert fs == ["# a", "# 1차", "assets/q.png", ["q.png"], "data:image/png;base64,", "err", "시험폴더"]
+    assert page.evaluate("document.querySelector('#m-folder').hidden") is True  # 창 모드(NATIVE)에서는 숨김
     # 쪽 나눔 끄기: 경계가 사라지고 쪽 수가 비며, 다시 켜면 돌아온다
     page.click("#btn-pages"); time.sleep(0.5)
-    print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmak.pages')"))
-    assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() == 0 and page.inner_text("#pages") == "" and page.evaluate("localStorage.getItem('nongmak.pages')") == "0"
+    print("쪽 끔:", page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(), repr(page.inner_text("#pages")), page.evaluate("localStorage.getItem('nongmark.pages')"))
+    assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() == 0 and page.inner_text("#pages") == "" and page.evaluate("localStorage.getItem('nongmark.pages')") == "0"
     page.click("#btn-pages"); time.sleep(0.5)
     assert page.locator(".nm-desk:not([hidden]) .nm-pagegap").count() >= 2
     # 인쇄: 편집기 DOM 복제본 한 흐름, 쪽 경계 수가 같고 PDF 쪽 수 = 경계 + 1 (Chromium 인쇄 엔진)

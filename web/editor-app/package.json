@@ -1,8 +1,8 @@
 {
-  "name": "nongmak-editor",
+  "name": "nongmark-editor",
   "private": true,
   "version": "0.0.0",
-  "description": "새싹이의 농막 편집기 묶음(ProseMirror/Tiptap, React 없음) - esbuild로 한 파일로 묶어 nongmak.html에 넣는다",
+  "description": "새싹이의 농막 편집기 묶음(ProseMirror/Tiptap, React 없음) - esbuild로 한 파일로 묶어 nongmark.html에 넣는다",
   "scripts": {
     "build": "node build.mjs"
   },
