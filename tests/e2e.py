@@ -111,9 +111,25 @@ with sync_playwright() as p:
     gaps = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count()
     print("긴 표: 쪽 경계", gaps, "| 상태 줄", page.inner_text("#pages"))
     assert gaps >= 1 and page.inner_text("#pages") == f"{gaps + 1}쪽"
+    # 긴 코드 블록: 줄 단위로 쪽을 넘긴다(경계가 코드 안에), 가로 스크롤 없음(복제 쪽에서도), 인쇄 PDF 쪽 수 = 경계 + 1
+    page.evaluate("""() => { window.__files["긴 코드.md"] = "# 긴 코드\\n\\n앞 문단\\n\\n```\\n" + Array.from({length: 150}, (_, n) => `줄 ${n}: ` + "x".repeat(n % 7 === 0 ? 140 : 30)).join("\\n") + "\\n```\\n\\n뒤 문단\\n"; }""")
+    open_doc("긴 코드.md")
+    gaps = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count(); inner = page.locator(".nm-desk:not([hidden]) pre .nm-pagegap").count()
+    pre_scroll = page.evaluate("""[...document.querySelectorAll('.nm-desk:not([hidden]) pre')].map(p => { const pr = p.getBoundingClientRect(); let right = 0; const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT); for (let t = w.nextNode(); t; t = w.nextNode()) { if (t.parentElement.closest('.nm-pagegap')) continue; const r = document.createRange(); r.selectNodeContents(t); for (const c of r.getClientRects()) right = Math.max(right, c.right); } return Math.round(right - (pr.right - 16)); })""")
+    print("긴 코드: 쪽 경계", gaps, "(코드 안", inner, ") | 상태 줄", page.inner_text("#pages"), "| pre 가로 넘침", pre_scroll)
+    assert gaps >= 2 and inner == gaps and page.inner_text("#pages") == f"{gaps + 1}쪽" and all(d <= 0 for d in pre_scroll)
+    # 경계 뒤 첫 줄이 정확히 다음 쪽 위 여백 아래에서 시작하는지(뿌리 기준 k×PERIOD)
+    drift = page.evaluate("""() => { const root = document.querySelector('.nm-desk:not([hidden]) .nm-pm'); const P = 1146; return [...root.querySelectorAll('.nm-pagegap')].map((g, i) => { const r = document.createRange(); let t = g.nextSibling; while (t && t.nodeType !== 3) t = t.nextSibling; if (!t) return null; r.setStart(t, 0); r.setEnd(t, 1); return Math.round(r.getBoundingClientRect().top - root.getBoundingClientRect().top - (i + 1) * P); }); }""")
+    print("코드 경계 뒤 첫 줄 자리 오차(px):", drift); assert all(d is not None and 0 <= d <= 6 for d in drift)
+    page.evaluate("() => { const t = cur(); const d = document.querySelector('#print-doc'); d.textContent = ''; d.append(cloneEditorContent(t)); d.hidden = false; }")
+    page.pdf(path=str(ROOT / "build" / "print-code.pdf"), prefer_css_page_size=True)
+    import re as _re
+    npages = len(_re.findall(rb"/Type\s*/Page[^s]", (ROOT / "build" / "print-code.pdf").read_bytes()))
+    print("긴 코드 인쇄: PDF 쪽 수", npages); assert npages == gaps + 1
+    page.evaluate("() => { const d = document.querySelector('#print-doc'); d.hidden = true; d.textContent = ''; }")
     # 긴 문서: 여러 쪽, 쪽 나눔 뒤는 새 쪽
     open_doc("긴 문서.md")
-    assert page.locator(".tab").count() == 4
+    assert page.locator(".tab").count() == 5
     gaps = page.locator(".nm-desk:not([hidden]) .nm-pagegap").count()
     w = page.evaluate("document.querySelector('.nm-desk:not([hidden]) .nm-sheet').getBoundingClientRect().width")
     print("긴 문서: 쪽 경계", gaps, "| 쪽 폭 px:", round(w))

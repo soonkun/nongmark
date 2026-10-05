@@ -180,6 +180,49 @@ function gapWidget(remaining, pageNo) {
   return dom;
 }
 
+/** 코드 블록(pre > code) 안의 글자 위치 → 그 줄의 위 가장자리(블록 위 가장자리 기준, 안에 든 경계 위젯 높이는 뺀 CSS px).
+ * 배치(getClientRects)로 재므로 화면 밖·격자 보기에서 가려진 블록도 된다(posAtCoords는 보이는 곳만 맞힌다). */
+function codeText(dom) {
+  const parts = []; // {node, start} - 경계 위젯 안 글자("- 3 -")는 뺀다
+  let n = 0;
+  const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT, { acceptNode: (t) => (t.parentElement.closest(".nm-pagegap") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) { parts.push({ node: t, start: n }); n += t.length; }
+  return { parts, length: n };
+}
+function lineTopAt(dom, text, i, rect, z, gaps) {
+  let part = text.parts[0];
+  for (const q of text.parts) { if (q.start <= i) part = q; else break; }
+  if (!part) return 0;
+  const k = Math.min(i - part.start, part.node.length - 1);
+  const r = document.createRange();
+  r.setStart(part.node, k); r.setEnd(part.node, k + 1);
+  const cr = r.getBoundingClientRect();
+  let top = cr.top - rect.top;
+  for (const g of gaps) if (g.top < cr.top) top -= g.height;
+  return top / z;
+}
+/** 코드 블록을 blockTop부터 room(px) 안에 들어가는 줄까지 두고 그 다음 줄 첫 글자의 (문서 오프셋, 줄 위 가장자리)를 돌려준다. 들어가는 줄이 없으면 null. */
+function codeSplit(dom, from, room) {
+  const text = codeText(dom);
+  if (!text.length) return null;
+  const rect = dom.getBoundingClientRect();
+  const z = rect.height / (dom.offsetHeight || 1) || 1;
+  const gaps = [...dom.querySelectorAll(".nm-pagegap")].map((g) => g.getBoundingClientRect());
+  const topAt = (i) => lineTopAt(dom, text, i, rect, z, gaps);
+  // 줄 높이는 글자 상자가 아니라 줄 상자(line-height)로 - 글자 상자(≈1.15em)로 재면 줄 상자가 쪽 아래로 몇 px 삐져나와 인쇄 엔진이 그 줄을 다음 쪽으로 밀고 한 줄짜리 쪽이 생긴다
+  const lh = parseFloat(getComputedStyle(text.parts[0].node.parentElement).lineHeight) || 21.6;
+  // 첫 번째로 "줄 아래 가장자리가 room을 넘는" 글자(줄 위치는 글자 순서대로 커진다 → 이분 탐색)
+  let lo = 0, hi = text.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (topAt(mid) + lh > from + room) hi = mid; else lo = mid + 1; }
+  if (lo >= text.length) return null; // 다 들어간다
+  const lineTop = topAt(lo);
+  if (lineTop <= from + 0.5) return null; // 한 줄도 못 들어간다
+  // 그 줄의 첫 글자
+  let a = 0, b = lo;
+  while (a < b) { const mid = (a + b) >> 1; if (topAt(mid) >= lineTop - 0.5) b = mid; else a = mid + 1; }
+  return { index: a, top: lineTop };
+}
+
 export const PERIOD = PAGE.top + PAGE.contentH + PAGE.bottom + PAGE.gap; // 흐름에서 쪽 하나가 차지하는 높이(297mm + 책상 틈)
 
 /** 경계 위젯들을 실제 위치에 맞춘다: 쪽 k의 첫 블록이 정확히 k×PERIOD + 위 여백에서 시작하게.
@@ -189,7 +232,7 @@ function alignGaps(view) {
   if (!sheet) return 0;
   // 좌표는 편집기 뿌리(.nm-pm, position: relative) 기준이다. 뿌리는 sheet의 위 여백(PAGE.top) 아래에서 시작하므로
   // 쪽 k의 내용은 뿌리 기준 k×PERIOD 에서 시작해야 한다(= sheet 기준 k×PERIOD + 위 여백).
-  const gaps = [...view.dom.querySelectorAll(":scope > .nm-pagegap")];
+  const gaps = [...view.dom.querySelectorAll(".nm-pagegap")]; // 맨 바깥 블록 사이 + 코드 블록 안(문서 순서) - 코드 블록은 position이 없어 offsetTop이 뿌리 기준이다
   gaps.forEach((g, i) => {
     const want = (i + 1) * PERIOD; // 다음 쪽 첫 블록이 와야 할 자리(뿌리 기준)
     const top = g.offsetTop; // 여기까지 앞 쪽 내용이 끝났다
@@ -239,7 +282,9 @@ export const Pages = Extension.create({
           m = (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
           marginCache.set(key, m);
         }
-        extent.set(a, a.offsetHeight + m);
+        let h = a.offsetHeight + m;
+        for (const g of a.querySelectorAll(".nm-pagegap")) h -= g.offsetHeight; // 코드 블록 안에 이미 놓인 경계는 내용이 아니다
+        extent.set(a, h);
       }
       const LIMIT = PAGE.contentH - 6; // 인쇄 엔진과의 반올림 차이 여유
       let y = 0, page = 1, force = false;
@@ -248,6 +293,22 @@ export const Pages = Extension.create({
         if (!dom || !(dom instanceof HTMLElement)) return;
         const h = extent.has(dom) ? extent.get(dom) : dom.offsetHeight;
         if (node.type.name === "pageBreak") { force = true; y += h; return; }
+        // 코드 블록은 인쇄처럼 줄 단위로 자른다: 남은 자리에 들어가는 줄까지 두고 다음 줄 앞에 경계를 놓는다(여러 쪽에 걸치면 여러 번).
+        // 화면·인쇄·PDF가 같은 줄에서 넘어가고, 쪽 여백에 묻히는 글자가 없다. 남은 자리가 두 줄도 안 되면 블록째 다음 쪽으로.
+        if (node.type.name === "codeBlock") {
+          if (force && y > 0) { breaks.push([offset, Math.max(0, PAGE.contentH - y), page++]); y = 0; }
+          force = false;
+          let from = 0; // 지금 쪽에 놓을 부분의 시작(블록 위 가장자리 기준 px)
+          while (y + (h - from) > LIMIT) {
+            const cut = y + 48 < LIMIT ? codeSplit(dom, from, LIMIT - y) : null;
+            if (!cut) { if (y > 0 && from === 0) { breaks.push([offset, Math.max(0, PAGE.contentH - y), page++]); y = 0; continue; } break; }
+            breaks.push([offset + 1 + cut.index, Math.max(0, PAGE.contentH - (y + cut.top - from)), page++]);
+            y = 0;
+            from = cut.top;
+          }
+          y += h - from;
+          return;
+        }
         // 한 쪽보다 긴 블록(긴 표)은 쪽 절반 넘게 찼을 때만 다음 쪽으로 보낸다 - 아니면 거의 빈 쪽이 남는다. 인쇄는 줄 단위로 자른다.
         const tall = h > LIMIT && y < LIMIT / 2;
         if (y > 0 && (force || (y + h > LIMIT && !tall))) {

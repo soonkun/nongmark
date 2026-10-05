@@ -23,7 +23,8 @@
 .nm-pm ul[data-type="taskList"] ul:not([data-type="taskList"]) { list-style: disc; padding-left: 1.6em; } /* 할 일 아래 일반 목록은 점 표시 */
 .nm-pm a { color: var(--green); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--green) 40%, transparent); text-underline-offset: 3px; cursor: text; }
 .nm-pm code { background: var(--code); border-radius: 4px; padding: .1em .35em; font: .88em "D2Coding", "Consolas", monospace; color: var(--code-ink); }
-.nm-pm pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow: auto; margin: 8px 0; }
+.nm-pm pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow: visible; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; } /* 가로 스크롤 없음: 화면과 인쇄가 같아야 한다 - 긴 줄은 접는다(ProseMirror 기본값과 같게, 복제 쪽·인쇄본에도 똑같이) */
+.nm-pm pre .nm-pagegap { margin: 0 calc(-20mm - 17px); } /* 코드 블록 안에서 쪽을 넘길 때: 경계 띠가 코드 상자(안쪽 여백 16px+테두리 1px) 밖 쪽 가장자리까지 덮는다 */
 .nm-pm pre code { background: none; color: var(--ink); padding: 0; font-size: 13.5px; }
 .nm-pm blockquote { margin: 8px 0; padding: 2px 16px; border-left: 3px solid var(--wood-d); color: color-mix(in srgb, var(--ink) 85%, var(--muted)); }
 .nm-pm hr { border: 0; height: 1px; background: var(--line); margin: 20px 0; }

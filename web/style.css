@@ -175,6 +175,7 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
   .print-doc .nm-pm { min-height: 0; color: #000; }
   .print-doc .nm-pagegap { display: none; }
   .print-doc .nm-pagegap + * { break-before: page; }
+  .print-doc pre .nm-pagegap { display: block; height: 0 !important; overflow: hidden; break-before: page; } /* 코드 블록 안의 경계: 다음 형제가 글자라 + *로는 못 잡는다. break-after는 Chromium이 다음 줄 뒤에서 한 번 더 넘겨 한 줄짜리 쪽이 생긴다 → break-before */
   .print-doc thead { display: table-header-group; } .print-doc tr, .print-doc img { break-inside: avoid; }
   .print-doc h1, .print-doc h2, .print-doc h3 { break-after: avoid; }
 }
