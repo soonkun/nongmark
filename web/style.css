@@ -42,9 +42,9 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .ask-msg { margin: 0 0 18px; font-size: 15px; line-height: 1.6; word-break: keep-all; }
 .ask-row { display: flex; gap: 8px; justify-content: flex-end; }
 /* 시작 화면 - 농막 벽처럼 세로 판자 결 */
-.welcome { display: grid; place-items: center; padding: 32px 20px;
+.welcome { display: grid; place-items: center; padding: 32px 20px; overflow: auto;
   background: repeating-linear-gradient(90deg, var(--wall) 0 118px, var(--line) 118px 119px) , var(--wall); }
-.welcome-card { width: min(640px, 100%); text-align: center; background: var(--paper); border: 1px solid var(--line); border-radius: 18px;
+.welcome-card { zoom: 1.5; width: min(640px, 100%); text-align: center; background: var(--paper); border: 1px solid var(--line); border-radius: 18px;
   padding: 36px 36px 28px; box-shadow: var(--shadow); border-bottom: 6px solid var(--wood); }
 .wordmark { width: min(360px, 80%); height: auto; display: block; margin: 0 auto 4px; }
 .lead { margin: 0 0 24px; color: var(--muted); letter-spacing: .02em; }
@@ -52,11 +52,11 @@ kbd { font: 11px/1 "Consolas", monospace; color: var(--muted); border: 1px solid
 .tile { display: grid; gap: 2px; justify-items: start; text-align: left; padding: 14px 14px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--wall); cursor: pointer; position: relative; }
 .tile:hover { border-color: var(--leaf); background: var(--green-soft); }
 .tile-t { font-weight: 700; color: var(--green-d); font-size: 15.5px; }
-.tile-s { font-size: 12.5px; color: var(--muted); }
+.tile-s { font-size: 13.5px; color: var(--muted); }
 .tile kbd { position: absolute; top: 12px; right: 10px; }
-.note { color: var(--muted); font-size: 12.5px; margin: 16px 0 0; line-height: 1.6; }
+.note { color: var(--muted); font-size: 13.5px; margin: 16px 0 0; line-height: 1.6; }
 .recent { text-align: left; margin-top: 4px; }
-.recent-title { font-size: 12.5px; color: var(--muted); margin: 0 4px 4px; }
+.recent-title { font-size: 13.5px; color: var(--muted); margin: 0 4px 4px; }
 .recent button { display: flex; width: 100%; gap: 10px; align-items: baseline; border: 0; background: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; text-align: left; }
 .recent button:hover { background: var(--green-soft); }
 .recent .r-name { font-weight: 600; color: var(--green-d); white-space: nowrap; }
